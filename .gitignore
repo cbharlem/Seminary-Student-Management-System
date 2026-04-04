@@ -1,0 +1,30 @@
+# Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Spring Boot
+*.log
+logs/
+
+# Environment / secrets
+.env
+*.env
+
+# Uploads (user-generated files, not source code)
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Internal docs
+SECURITY.md

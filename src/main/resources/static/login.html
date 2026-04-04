@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SMS – Login | St. Francis de Sales Seminary</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+<style>
+  body { display:flex; height:100vh; overflow:hidden; }
+  .login-left {
+    width:37%; background:var(--navy);
+    display:flex; flex-direction:column; align-items:flex-start;
+    padding:40px 48px; position:relative; overflow:hidden;
+  }
+  .login-left::before {
+    content:''; position:absolute; bottom:-80px; right:-80px;
+    width:320px; height:320px; border-radius:50%;
+    background:rgba(255,255,255,0.08);
+  }
+  .login-left::after {
+    content:''; position:absolute; top:-60px; left:-60px;
+    width:240px; height:240px; border-radius:50%;
+    background:rgba(255,255,255,0.06);
+  }
+  .login-logo {
+    width:64px; height:64px; border-radius:50%;
+    background:white;
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom:auto; z-index:1;
+    padding:4px;
+  }
+  .login-logo img { width:56px; height:56px; object-fit:contain; }
+  .login-brand { margin-bottom:48px; z-index:1; }
+  .login-brand h1 {
+    font-family:'Plus Jakarta Sans',sans-serif;
+    font-size:2.6rem; color:white; line-height:1.15;
+  }
+  .login-brand p { color:rgba(255,255,255,0.55); font-size:0.9rem; margin-top:10px; }
+  .login-right {
+    flex:1; background:white;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    padding:60px 80px;
+    box-shadow:-4px 0 24px rgba(13,27,94,0.08);
+    position:relative;
+  }
+  /* Option C – footer */
+  .login-footer {
+    position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
+    font-size:0.72rem; color:var(--gray-400); white-space:nowrap;
+  }
+  .login-right h2 {
+    font-family:'Plus Jakarta Sans',sans-serif;
+    font-size:2rem; color:var(--gray-800);
+  }
+  .login-sub { color:var(--gray-600); font-size:0.95rem; margin-top:6px; margin-bottom:40px; }
+  .form-group { width:100%; max-width:400px; margin-bottom:20px; }
+  .form-group label { display:block; font-size:0.85rem; font-weight:500; color:var(--gray-600); margin-bottom:8px; }
+  .form-group input {
+    width:100%; padding:12px 16px;
+    border:1.5px solid var(--gray-200); border-radius:8px;
+    font-size:0.95rem; font-family:'Plus Jakarta Sans',sans-serif;
+    color:var(--gray-800); outline:none; transition:border-color .2s;
+  }
+  .form-group input:focus { border-color:var(--accent); }
+  .btn-login {
+    width:100%; max-width:400px; padding:14px;
+    background:var(--navy); color:white; border:none;
+    border-radius:8px; font-size:1rem; font-weight:600;
+    cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif;
+    transition:background .2s; margin-top:8px;
+  }
+  .btn-login:hover { background:var(--navy-mid); }
+  .login-error {
+    width:100%; max-width:400px; margin-bottom:16px;
+    padding:10px 14px; border-radius:8px;
+    background:var(--danger-bg); color:var(--danger);
+    font-size:0.85rem; display:none;
+  }
+  .login-error.show { display:block; }
+  .attempt-counter {
+    display:block; margin-top:8px; padding-top:8px;
+    border-top:1px solid rgba(0,0,0,0.08);
+    font-size:0.8rem; font-weight:500;
+  }
+  .attempt-counter--last {
+    font-weight:700; letter-spacing:0.01em;
+  }
+  .login-blocked {
+    width:100%; max-width:400px; margin-bottom:16px;
+    padding:14px 16px; border-radius:8px;
+    background:#fff7ed; color:#92400e;
+    border:1.5px solid #fdba74;
+    font-size:0.875rem; display:none; line-height:1.6;
+  }
+  .login-blocked.show { display:block; }
+  .login-blocked strong { display:block; font-size:0.95rem; margin-bottom:4px; }
+  .login-blocked .countdown { font-weight:600; font-variant-numeric:tabular-nums; }
+  .btn-login:disabled {
+    background:var(--gray-300,#d1d5db); color:var(--gray-500,#6b7280);
+    cursor:not-allowed;
+  }
+  .password-wrapper { position:relative; }
+  .password-wrapper input { padding-right:44px; }
+  .toggle-password {
+    position:absolute; right:14px; top:50%; transform:translateY(-50%);
+    background:none; border:none; cursor:pointer; padding:0;
+    color:var(--gray-400); font-size:1rem; line-height:1;
+  }
+  .toggle-password:hover { color:var(--gray-600); }
+  @media (max-width:768px) { .login-left { display:none; } }
+</style>
+</head>
+<body>
+<div class="login-left">
+  <div class="login-logo">
+    <img src="/images/seminaryLogo.png" alt="Seminary Logo"/>
+  </div>
+  <div class="login-brand">
+    <h1>Student<br>Management<br>System</h1>
+    <p>St. Francis De Sales Major Seminary</p>
+  </div>
+</div>
+
+<div class="login-right">
+  <h2>Welcome Back!</h2>
+  <p class="login-sub">Sign in to your account</p>
+  <div class="login-error" id="login-error" role="alert" aria-live="polite">Invalid username or password. Please try again.</div>
+  <div class="login-blocked" id="login-blocked" role="alert" aria-live="polite">
+    <strong>Too many failed attempts</strong>
+    Your account has been temporarily locked for security reasons.
+    Please try again in <span class="countdown" id="countdown">15:00</span>.
+  </div>
+  <div class="form-group">
+    <label for="username">Username</label>
+    <input type="text" id="username" placeholder="Enter Username" autocomplete="username"/>
+  </div>
+  <div class="form-group">
+    <label for="password">Password</label>
+    <div class="password-wrapper">
+      <input type="password" id="password" placeholder="Enter Password" autocomplete="current-password"/>
+      <button type="button" class="toggle-password" onclick="togglePassword()" title="Show/hide password">
+        <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg id="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
+    </div>
+  </div>
+  <button class="btn-login" onclick="doLogin()">Sign In</button>
+
+  <!-- Option C: footer -->
+  <div class="login-footer">&copy; 2026 St. Francis de Sales Major Seminary &nbsp;&bull;&nbsp; Student Management System</div>
+</div>
+
+<script>
+  function togglePassword() {
+    const input = document.getElementById('password');
+    const eyeOn = document.getElementById('icon-eye');
+    const eyeOff = document.getElementById('icon-eye-off');
+    if (input.type === 'password') {
+      input.type = 'text';
+      eyeOn.style.display = 'none';
+      eyeOff.style.display = '';
+    } else {
+      input.type = 'password';
+      eyeOn.style.display = '';
+      eyeOff.style.display = 'none';
+    }
+  }
+
+  // Listen for Enter key — only if login button is not disabled
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !btnLogin.disabled) doLogin();
+  });
+
+  // Show error/logout/blocked messages from URL params (set by Spring Security redirects)
+  const params  = new URLSearchParams(window.location.search);
+  const errBox  = document.getElementById('login-error');
+  const blocked = document.getElementById('login-blocked');
+  const btnLogin = document.querySelector('.btn-login');
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+
+  if (params.get('error')) {
+    errBox.style.background = ''; errBox.style.color = '';
+    const remaining = parseInt(params.get('attempts') || '0', 10);
+
+    // Main error message
+    const msgEl = document.createElement('span');
+    msgEl.textContent = 'Invalid username or password. Please try again.';
+    errBox.innerHTML = '';
+    errBox.appendChild(msgEl);
+
+    // Attempt counter — Nielsen #1 (system status) + Nielsen #9 (error recovery)
+    if (remaining > 0) {
+      const counterEl = document.createElement('span');
+      counterEl.className = 'attempt-counter' + (remaining === 1 ? ' attempt-counter--last' : '');
+      counterEl.setAttribute('aria-label', remaining + ' login attempts remaining');
+      if (remaining === 1) {
+        counterEl.textContent = '1 attempt remaining — your account will be locked on the next failed attempt.';
+      } else {
+        counterEl.textContent = remaining + ' attempts remaining.';
+      }
+      errBox.appendChild(counterEl);
+    }
+
+    errBox.classList.add('show');
+  }
+
+  if (params.get('logout')) {
+    errBox.style.background = 'var(--success-bg,#e6f4ec)';
+    errBox.style.color = 'var(--success,#2d7d46)';
+    errBox.textContent = 'You have been logged out successfully.';
+    errBox.classList.add('show');
+  }
+
+  if (params.get('blocked')) {
+    // Show blocked message and disable form — ISO 9241-143 / Nielsen #1 + #9
+    blocked.classList.add('show');
+    btnLogin.disabled = true;
+    usernameInput.disabled = true;
+    passwordInput.disabled = true;
+
+    // Use sessionStorage to track when the block actually started.
+    // This ensures the countdown shows the real remaining time even if
+    // the user navigates away, changes the URL, and lands here again.
+    const BLOCK_MS = 15 * 60 * 1000;
+    const storageKey = 'sms_block_start';
+    const now = Date.now();
+    const stored = parseInt(sessionStorage.getItem(storageKey) || '0', 10);
+    const blockStart = (stored && now - stored < BLOCK_MS) ? stored : now;
+    sessionStorage.setItem(storageKey, blockStart);
+
+    const countdownEl = document.getElementById('countdown');
+    let remaining = Math.max(0, Math.round((BLOCK_MS - (now - blockStart)) / 1000));
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const sec = (s % 60).toString().padStart(2, '0');
+      return `${m}:${sec}`;
+    }
+
+    countdownEl.textContent = formatTime(remaining);
+
+    const timer = setInterval(() => {
+      remaining--;
+      countdownEl.textContent = formatTime(remaining);
+      if (remaining <= 0) {
+        clearInterval(timer);
+        sessionStorage.removeItem(storageKey);
+        // Re-enable the form and update message
+        blocked.innerHTML = '<strong>You may try again</strong>The lockout period has ended. Please enter your credentials below.';
+        btnLogin.disabled = false;
+        usernameInput.disabled = false;
+        passwordInput.disabled = false;
+        usernameInput.focus();
+      }
+    }, 1000);
+  }
+
+  function doLogin() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) {
+      errBox.style.background = ''; errBox.style.color = '';
+      errBox.textContent = 'Please enter both username and password.';
+      errBox.classList.add('show');
+      return;
+    }
+    // Submit the form directly to Spring Boot's /login endpoint
+    // Spring Security handles authentication and redirects to /index.html on success
+    // /login is excluded from CSRF in SecurityConfig — no token needed here
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/login';
+    const u = document.createElement('input'); u.name = 'username'; u.value = username; form.appendChild(u);
+    const p = document.createElement('input'); p.name = 'password'; p.value = password; form.appendChild(p);
+    document.body.appendChild(form);
+    form.submit();
+  }
+</script>
+</body>
+</html>
