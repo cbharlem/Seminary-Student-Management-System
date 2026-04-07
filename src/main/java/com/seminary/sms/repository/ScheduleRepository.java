@@ -21,4 +21,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     List<Schedule> findConflictsByRoom(@Param("roomId") String roomId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
     @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
     List<Schedule> findConflictsByInstructor(@Param("instructorId") String instructorId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+    @Query("SELECT s FROM Schedule s WHERE s.room.roomId = :roomId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsByRoomExcluding(@Param("roomId") String roomId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+    @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsByInstructorExcluding(@Param("instructorId") String instructorId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
 }

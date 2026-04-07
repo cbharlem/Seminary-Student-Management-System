@@ -45,7 +45,10 @@ function validateRequired(fields) {
 }
 
 // ── State ─────────────────────────────────────────────────────
+let _enrStudents = [];
 let _currentStudentId = null;
+let _scheduleCache = {};
+let _currentStudent = null;
 let _currentApplicantId = null;
 let _currentReportType  = null;
 const _courseMap = {};
@@ -235,9 +238,10 @@ async function loadEnrollment() {
     const url = selected ? `/api/enrollment?semester=${selected}` : '/api/enrollment';
     const data = await api(url);
     const tbody = document.getElementById('tbl-enrollment');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No enrollments found.</p></div></td></tr>'; return; }
-    tbody.innerHTML = data.map(e =>
-      `<tr style="cursor:pointer" onclick="viewSubjects('${escHtml(e.enrollmentId)}')">
+    const active = data.filter(e => e.student?.currentStatus !== 'Alumni');
+    if (!active.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No enrollments found.</p></div></td></tr>'; return; }
+    tbody.innerHTML = active.map(e =>
+      `<tr style="cursor:pointer" onclick="viewSubjects('${escHtml(e.enrollmentId)}','${escHtml(e.student?.firstName)} ${escHtml(e.student?.lastName)}','${escHtml(e.program?.programId || '')}')">
         <td>${escHtml(e.enrollmentId)}</td>
         <td>${escHtml(e.student?.firstName)} ${escHtml(e.student?.lastName)}</td>
         <td>${escHtml(e.program?.programCode)}</td>
@@ -288,6 +292,7 @@ async function viewStudent(id) {
   try {
     const s = await api(`/api/students/${id}`);
     _currentStudentId = id;
+    _currentStudent = s;
     document.getElementById('sd-title').textContent = `${s.firstName} ${s.lastName}`;
     document.getElementById('sd-sub').textContent   = `${s.studentId} · ${s.program?.programName || '—'}`;
     document.getElementById('sd-avatar').textContent = (s.firstName[0] + s.lastName[0]).toUpperCase();
@@ -333,9 +338,31 @@ async function loadAlumni() {
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No alumni records yet. Graduated students will appear here.</p></div></td></tr>'; return; }
     tbody.innerHTML = data.map(a =>
       `<tr><td>${escHtml(a.alumniId)}</td><td>${escHtml(a.student?.firstName)} ${escHtml(a.student?.lastName)}</td><td>${escHtml(a.program?.programCode)}</td><td>${fmtDate(a.graduationDate)}</td><td>${escHtml(a.honors || '—')}</td><td>${escHtml(a.currentMinistry || '—')}</td>
-      <td><button class="btn btn-outline btn-sm">Edit</button></td></tr>`
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm">Edit</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="unmarkAlumni('${escHtml(a.alumniId)}','${escHtml(a.student?.firstName)} ${escHtml(a.student?.lastName)}')">Unmark</button>
+      </td></tr>`
     ).join('');
   } catch (e) { console.error(e); }
+}
+
+let _unmarkAlumniId   = null;
+let _unmarkAlumniName = null;
+
+function unmarkAlumni(alumniId, studentName) {
+  _unmarkAlumniId   = alumniId;
+  _unmarkAlumniName = studentName;
+  document.getElementById('unmark-alumni-name').textContent = studentName;
+  openModal('modal-unmark-alumni');
+}
+
+async function confirmUnmarkAlumni() {
+  try {
+    await api(`/api/alumni/${_unmarkAlumniId}`, 'DELETE');
+    toast(`${_unmarkAlumniName} has been reactivated as a student`);
+    closeModal('modal-unmark-alumni');
+    loadAlumni();
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 async function loadCurriculum(programId, tbodyId) {
@@ -391,6 +418,8 @@ async function loadSchedule() {
   } catch (_) {}
   try {
     const data = await api('/api/schedule');
+    _scheduleCache = {};
+    data.forEach(s => { _scheduleCache[s.scheduleId] = s; });
     const tbody = document.getElementById('tbl-schedule');
     tbody.innerHTML = data.map(s =>
       `<tr>
@@ -400,7 +429,10 @@ async function loadSchedule() {
         <td>${escHtml(s.room?.roomName)}</td>
         <td>${escHtml(s.dayOfWeek)}</td>
         <td>${escHtml(s.timeStart)} – ${escHtml(s.timeEnd)}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteSchedule('${escHtml(s.scheduleId)}')">Delete</button></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="openEditSchedModal('${escHtml(s.scheduleId)}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteSchedule('${escHtml(s.scheduleId)}')">Delete</button>
+        </td>
       </tr>`
     ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">No schedules yet</td></tr>';
   } catch (e) { console.error(e); }
@@ -737,6 +769,68 @@ async function saveApplicant() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+function closeStudentModal() {
+  document.getElementById('st-modal').classList.remove('editing');
+  document.getElementById('st-modal-title').textContent = 'Student Record';
+  document.getElementById('st-modal-sub').textContent   = 'Fill in the student\'s details';
+  document.getElementById('st-save-btn').textContent    = 'Save Record';
+  closeModal('modal-student');
+}
+
+function openAddStudentModal() {
+  _currentStudent   = null;
+  _currentStudentId = null;
+  document.getElementById('st-modal').classList.remove('editing');
+  document.getElementById('st-modal-title').textContent = 'Student Record';
+  document.getElementById('st-modal-sub').textContent   = 'Fill in the student\'s details';
+  document.getElementById('st-save-btn').textContent    = 'Save Record';
+  openModal('modal-student');
+}
+
+function openEditStudentModal() {
+  if (!_currentStudent) return;
+  const s = _currentStudent;
+  // Activate editing style
+  document.getElementById('st-modal').classList.add('editing');
+  document.getElementById('st-modal-title').textContent = `${s.firstName} ${s.lastName}`;
+  document.getElementById('st-modal-sub').textContent   = `${s.studentId} · ${s.program?.programCode || '—'}`;
+  document.getElementById('st-save-btn').textContent    = 'Save Changes';
+  // Reset to first tab
+  switchTab(document.querySelector('#modal-student .tab'), 'st-tab-personal', stTabs);
+  // Personal
+  document.getElementById('st-fname').value      = s.firstName || '';
+  document.getElementById('st-lname').value      = s.lastName || '';
+  document.getElementById('st-mname').value      = s.middleName || '';
+  document.getElementById('st-dob').value        = s.dateOfBirth || '';
+  document.getElementById('st-gender').value     = s.gender || '';
+  document.getElementById('st-nationality').value= s.nationality || '';
+  document.getElementById('st-contact').value    = s.contactNumber || '';
+  document.getElementById('st-email').value      = s.email || '';
+  document.getElementById('st-address').value    = s.address || '';
+  document.getElementById('st-blood').value      = s.bloodType || '';
+  document.getElementById('st-medical').value    = s.medicalConditions || '';
+  // Family
+  document.getElementById('st-father').value     = s.fatherName || '';
+  document.getElementById('st-father-occ').value = s.fatherOccupation || '';
+  document.getElementById('st-mother').value     = s.motherName || '';
+  document.getElementById('st-mother-occ').value = s.motherOccupation || '';
+  document.getElementById('st-guardian').value   = s.guardianName || '';
+  document.getElementById('st-guardian-contact').value = s.guardianContact || '';
+  // Religious
+  document.getElementById('st-religion').value   = s.religion || '';
+  document.getElementById('st-diocese').value    = s.diocese || '';
+  document.getElementById('st-priest').value     = s.parishPriest || '';
+  document.getElementById('st-baptism').value    = s.baptismDate || '';
+  document.getElementById('st-baptism-church').value = s.baptismChurch || '';
+  document.getElementById('st-confirm').value    = s.confirmationDate || '';
+  // Academic
+  document.getElementById('st-sem-level').value  = s.seminaryLevel || 'College';
+  document.getElementById('st-program').value    = s.program?.programId || '';
+  document.getElementById('st-year').value       = s.currentYearLevel || '1';
+  document.getElementById('st-status').value     = s.currentStatus || 'Active';
+  openModal('modal-student');
+}
+
 async function saveStudent() {
   if (!validateRequired([
     {id:'st-fname',     label:'First Name'},
@@ -746,40 +840,99 @@ async function saveStudent() {
     {id:'st-sem-level', label:'Seminary Level'},
     {id:'st-program',   label:'Program'},
   ])) return;
+  const isEditing = !!_currentStudentId && !!_currentStudent;
+  const payload = {
+    firstName:        document.getElementById('st-fname').value,
+    lastName:         document.getElementById('st-lname').value,
+    middleName:       document.getElementById('st-mname').value,
+    dateOfBirth:      document.getElementById('st-dob').value,
+    gender:           document.getElementById('st-gender').value,
+    nationality:      document.getElementById('st-nationality').value,
+    contactNumber:    document.getElementById('st-contact').value,
+    email:            document.getElementById('st-email').value,
+    address:          document.getElementById('st-address').value,
+    bloodType:        document.getElementById('st-blood').value,
+    medicalConditions:document.getElementById('st-medical').value,
+    fatherName:       document.getElementById('st-father').value,
+    fatherOccupation: document.getElementById('st-father-occ').value,
+    motherName:       document.getElementById('st-mother').value,
+    motherOccupation: document.getElementById('st-mother-occ').value,
+    guardianName:     document.getElementById('st-guardian').value,
+    guardianContact:  document.getElementById('st-guardian-contact').value,
+    religion:         document.getElementById('st-religion').value,
+    diocese:          document.getElementById('st-diocese').value,
+    parishPriest:     document.getElementById('st-priest').value,
+    baptismDate:      document.getElementById('st-baptism').value || null,
+    baptismChurch:    document.getElementById('st-baptism-church').value,
+    confirmationDate: document.getElementById('st-confirm').value || null,
+    seminaryLevel:    document.getElementById('st-sem-level').value,
+    program:          { programId: document.getElementById('st-program').value },
+    currentYearLevel: parseInt(document.getElementById('st-year').value),
+    currentStatus:    document.getElementById('st-status').value,
+  };
   try {
-    await api('/api/students', 'POST', {
-      firstName:   document.getElementById('st-fname').value,
-      lastName:    document.getElementById('st-lname').value,
-      middleName:  document.getElementById('st-mname').value,
-      dateOfBirth: document.getElementById('st-dob').value,
-      gender:      document.getElementById('st-gender').value,
-      nationality: document.getElementById('st-nationality').value,
-      contactNumber:document.getElementById('st-contact').value,
-      email:       document.getElementById('st-email').value,
-      address:     document.getElementById('st-address').value,
-      bloodType:   document.getElementById('st-blood').value,
-      fatherName:  document.getElementById('st-father').value,
-      motherName:  document.getElementById('st-mother').value,
-      guardianName:document.getElementById('st-guardian').value,
-      religion:    document.getElementById('st-religion').value,
-      diocese:     document.getElementById('st-diocese').value,
-      parishPriest:document.getElementById('st-priest').value,
-      seminaryLevel:document.getElementById('st-sem-level').value,
-      program:     { programId: document.getElementById('st-program').value },
-      currentYearLevel: parseInt(document.getElementById('st-year').value),
-      currentStatus:    document.getElementById('st-status').value,
-    });
-    toast('Student record saved');
-    closeModal('modal-student'); loadStudents();
+    if (isEditing) {
+      const id = _currentStudentId;
+      await api(`/api/students/${id}`, 'PUT', payload);
+      toast('Student record updated');
+      closeStudentModal();
+      viewStudent(id);
+    } else {
+      await api('/api/students', 'POST', payload);
+      toast('Student record saved');
+      closeStudentModal(); loadStudents();
+    }
   } catch (e) { toast(e.message, 'error'); }
 }
 
+// ── Enroll Modal — Searchable Student Dropdown ───────────────
+function renderEnrStudentOptions(query) {
+  const list = document.getElementById('enr-student-list');
+  if (!list) return;
+  const q = (query || '').toLowerCase();
+  const filtered = _enrStudents.filter(s =>
+    `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q)
+  );
+  list.innerHTML = '';
+  if (!filtered.length) {
+    list.innerHTML = '<div class="enr-student-option no-match">No students found</div>';
+    return;
+  }
+  filtered.forEach(s => {
+    const label = `${s.firstName} ${s.lastName} (${s.studentId})`;
+    const item = document.createElement('div');
+    item.className = 'enr-student-option';
+    item.textContent = label;
+    item.setAttribute('role', 'option');
+    item.addEventListener('mousedown', e => {
+      e.preventDefault(); // keep focus on input until selection confirmed
+      document.getElementById('enr-student').value = s.studentId;
+      document.getElementById('enr-student-search').value = label;
+      closeEnrStudentDropdown();
+    });
+    list.appendChild(item);
+  });
+}
+function openEnrStudentDropdown() {
+  document.getElementById('enr-student-list').classList.add('open');
+}
+function closeEnrStudentDropdown() {
+  document.getElementById('enr-student-list').classList.remove('open');
+}
+
 async function openEnrollModal() {
+  // Reset student search
+  const searchEl = document.getElementById('enr-student-search');
+  const hiddenEl = document.getElementById('enr-student');
+  if (searchEl) searchEl.value = '';
+  if (hiddenEl) hiddenEl.value = '';
+  _enrStudents = [];
+
   // Populate selects
   try {
     const students = await api('/api/students?status=Active');
-    populateSelect('enr-student', students, 'studentId',
-      s => `${s.firstName} ${s.lastName} (${s.studentId})`, 'Select student…');
+    _enrStudents = students;
+    renderEnrStudentOptions('');
   } catch (_) {}
   try {
     const sems = await api('/api/school-years/semesters');
@@ -973,17 +1126,51 @@ async function confirmDeleteSection() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+function closeSchedModal() {
+  document.getElementById('sch-modal').classList.remove('editing');
+  document.getElementById('sch-modal-title').textContent = 'Add Schedule';
+  document.getElementById('sch-save-btn').textContent    = 'Save Schedule';
+  document.getElementById('sch-id').value                = '';
+  document.getElementById('sched-conflict-alert').style.display = 'none';
+  closeModal('modal-schedule');
+}
+
+async function _populateSchedSelects() {
+  const [sections, courses, instructors, rooms] = await Promise.all([
+    api('/api/sections'), api('/api/curriculum/courses'),
+    api('/api/sections/instructors'), api('/api/sections/rooms')
+  ]);
+  populateSelect('sch-section',    sections,    'sectionId',    s => s.sectionName, 'Select…');
+  populateSelect('sch-course',     courses,     'courseId',     c => `${c.courseCode} – ${c.courseName}`, 'Select…');
+  populateSelect('sch-instructor', instructors, 'instructorId', i => `${i.firstName} ${i.lastName}`, 'Select…');
+  populateSelect('sch-room',       rooms,       'roomId',       r => r.roomName, 'Select…');
+}
+
 async function openSchedModal() {
-  try {
-    const [sections, courses, instructors, rooms] = await Promise.all([
-      api('/api/sections'), api('/api/curriculum/courses'),
-      api('/api/sections/instructors'), api('/api/sections/rooms')
-    ]);
-    populateSelect('sch-section',    sections,    'sectionId',    s => s.sectionName, 'Select…');
-    populateSelect('sch-course',     courses,     'courseId',     c => `${c.courseCode} – ${c.courseName}`, 'Select…');
-    populateSelect('sch-instructor', instructors, 'instructorId', i => `${i.firstName} ${i.lastName}`, 'Select…');
-    populateSelect('sch-room',       rooms,       'roomId',       r => r.roomName, 'Select…');
-  } catch (_) {}
+  document.getElementById('sch-modal').classList.remove('editing');
+  document.getElementById('sch-modal-title').textContent = 'Add Schedule';
+  document.getElementById('sch-save-btn').textContent    = 'Save Schedule';
+  document.getElementById('sch-id').value                = '';
+  try { await _populateSchedSelects(); } catch (_) {}
+  openModal('modal-schedule');
+}
+
+async function openEditSchedModal(scheduleId) {
+  const s = _scheduleCache[scheduleId];
+  if (!s) { toast('Schedule data not found', 'error'); return; }
+  try { await _populateSchedSelects(); } catch (_) {}
+  document.getElementById('sch-modal').classList.add('editing');
+  document.getElementById('sch-modal-title').textContent = `${s.course?.courseCode} – ${s.section?.sectionCode}`;
+  document.getElementById('sch-save-btn').textContent    = 'Save Changes';
+  document.getElementById('sch-id').value                = s.scheduleId;
+  document.getElementById('sch-section').value           = s.section?.sectionId       || '';
+  document.getElementById('sch-course').value            = s.course?.courseId         || '';
+  document.getElementById('sch-instructor').value        = s.instructor?.instructorId || '';
+  document.getElementById('sch-room').value              = s.room?.roomId             || '';
+  document.getElementById('sch-day').value               = s.dayOfWeek                || '';
+  document.getElementById('sch-start').value             = s.timeStart                || '';
+  document.getElementById('sch-end').value               = s.timeEnd                  || '';
+  document.getElementById('sched-conflict-alert').style.display = 'none';
   openModal('modal-schedule');
 }
 
@@ -995,29 +1182,43 @@ async function saveSchedule() {
     {id:'sch-start',   label:'Start Time'},
     {id:'sch-end',     label:'End Time'},
   ])) return;
-  const alert = document.getElementById('sched-conflict-alert');
+  const alertEl = document.getElementById('sched-conflict-alert');
+  const schedId = document.getElementById('sch-id').value;
+  const payload = {
+    sectionId:    document.getElementById('sch-section').value,
+    courseId:     document.getElementById('sch-course').value,
+    instructorId: document.getElementById('sch-instructor').value,
+    roomId:       document.getElementById('sch-room').value,
+    dayOfWeek:    document.getElementById('sch-day').value,
+    timeStart:    document.getElementById('sch-start').value,
+    timeEnd:      document.getElementById('sch-end').value,
+  };
   try {
-    await api('/api/schedule', 'POST', {
-      sectionId:    document.getElementById('sch-section').value,
-      courseId:     document.getElementById('sch-course').value,
-      instructorId: document.getElementById('sch-instructor').value,
-      roomId:       document.getElementById('sch-room').value,
-      dayOfWeek:    document.getElementById('sch-day').value,
-      timeStart:    document.getElementById('sch-start').value,
-      timeEnd:      document.getElementById('sch-end').value,
-    });
-    alert.style.display = 'none';
-    toast('Schedule saved'); closeModal('modal-schedule'); loadSchedule();
+    if (schedId) {
+      await api(`/api/schedule/${schedId}`, 'PUT', payload);
+      toast('Schedule updated');
+    } else {
+      await api('/api/schedule', 'POST', payload);
+      toast('Schedule saved');
+    }
+    alertEl.style.display = 'none';
+    closeSchedModal(); loadSchedule();
   } catch (e) {
-    alert.textContent = e.message; alert.style.display = 'block';
+    alertEl.textContent = e.message; alertEl.style.display = 'block';
   }
 }
 
-async function deleteSchedule(id) {
-  if (!confirm('Delete this schedule?')) return;
+let _deleteSchedId = null;
+function confirmDeleteSchedule(id) {
+  _deleteSchedId = id;
+  openModal('modal-sched-delete');
+}
+
+async function doDeleteSchedule() {
   try {
-    await api(`/api/schedule/${id}`, 'DELETE');
-    toast('Schedule deleted'); loadSchedule();
+    await api(`/api/schedule/${_deleteSchedId}`, 'DELETE');
+    toast('Schedule deleted');
+    closeModal('modal-sched-delete'); loadSchedule();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1341,11 +1542,63 @@ async function saveApplicantEdit() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-async function viewSubjects(enrollmentId) {
+// ── Enrollment Subjects ───────────────────────────────────────
+let _currentEnrollmentId  = null;
+let _currentEnrollmentPgm = null;
+
+async function viewSubjects(enrollmentId, studentName, programId) {
+  _currentEnrollmentId  = enrollmentId;
+  _currentEnrollmentPgm = programId;
+  document.getElementById('enrs-title').textContent = 'Enrolled Subjects';
+  document.getElementById('enrs-sub').textContent   = `${studentName} · ${enrollmentId}`;
+  document.getElementById('enrs-add-form').style.display = 'none';
+  await refreshSubjectsTable();
+  openModal('modal-enr-subjects');
+}
+
+async function refreshSubjectsTable() {
   try {
-    const data = await api(`/api/enrollment/${enrollmentId}/subjects`);
-    alert('Enrolled subjects:\n' + (data.map(s => s.course?.courseName).join('\n') || 'None'));
-  } catch (_) {}
+    const data = await api(`/api/enrollment/${_currentEnrollmentId}/subjects`);
+    document.getElementById('enrs-body').innerHTML = data.length
+      ? data.map(s => `<tr>
+          <td>${escHtml(s.course?.courseCode || '—')}</td>
+          <td>${escHtml(s.course?.courseName || '—')}</td>
+          <td style="text-align:center">${escHtml(String(s.course?.units ?? '—'))}</td>
+          <td>${badge(s.status)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center;color:var(--gray-400);padding:20px">No subjects enrolled yet</td></tr>';
+  } catch (_) { toast('Failed to load subjects', 'error'); }
+}
+
+async function toggleAddSubjectForm() {
+  const form = document.getElementById('enrs-add-form');
+  const isHidden = form.style.display === 'none';
+  if (isHidden) {
+    // Populate course select filtered by program
+    try {
+      const url = _currentEnrollmentPgm
+        ? `/api/curriculum/courses?program=${_currentEnrollmentPgm}`
+        : '/api/curriculum/courses';
+      const courses = await api(url);
+      const select = document.getElementById('enrs-course-select');
+      select.innerHTML = '<option value="">Select course…</option>' +
+        courses.map(c => `<option value="${escHtml(c.courseId)}">${escHtml(c.courseCode)} — ${escHtml(c.courseName)}</option>`).join('');
+    } catch (_) { toast('Failed to load courses', 'error'); return; }
+    form.style.display = 'block';
+  } else {
+    form.style.display = 'none';
+  }
+}
+
+async function addEnrollmentSubject() {
+  const courseId = document.getElementById('enrs-course-select').value;
+  if (!courseId) { toast('Please select a course', 'error'); return; }
+  try {
+    await api(`/api/enrollment/${_currentEnrollmentId}/subjects`, 'POST', { courseId });
+    toast('Subject added successfully');
+    document.getElementById('enrs-add-form').style.display = 'none';
+    await refreshSubjectsTable();
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 // ── INIT ──────────────────────────────────────────────────────

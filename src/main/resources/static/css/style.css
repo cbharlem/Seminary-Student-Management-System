@@ -391,6 +391,31 @@ thead th.sortable.sort-desc::after {
 }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
 
+/* ── Searchable Student Dropdown (Enroll Modal) ──────────────── */
+.enr-student-wrap { position: relative; }
+.enr-student-wrap input[type="text"] {
+  width: 100%; box-sizing: border-box;
+  padding: 9px 13px; border: 1.5px solid var(--gray-200);
+  border-radius: 7px; font-size: 0.875rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--gray-800); outline: none; transition: border-color .2s;
+  background: white;
+}
+.enr-student-wrap input[type="text"]:focus { border-color: var(--accent); }
+.enr-student-list {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: white; border: 1.5px solid var(--gray-200); border-radius: 7px;
+  max-height: 200px; overflow-y: auto; z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+.enr-student-list.open { display: block; }
+.enr-student-option {
+  padding: 9px 13px; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;
+}
+.enr-student-option:hover { background: var(--accent); color: white; }
+.enr-student-option.no-match { color: var(--gray-400); cursor: default; }
+.enr-student-option.no-match:hover { background: transparent; color: var(--gray-400); }
+
 /* ── Welcome Banner ────────────────────────────────────────── */
 .welcome-banner {
   background: var(--navy); border-radius: 14px;

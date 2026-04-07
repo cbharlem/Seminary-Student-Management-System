@@ -54,4 +54,21 @@ public class AlumniService {
     public Alumni update(Alumni alumni) {
         return alumniRepository.save(alumni);
     }
+
+    @Transactional
+    public void unmarkAlumni(String alumniId) {
+        Alumni alumni = alumniRepository.findByAlumniId(alumniId)
+            .orElseThrow(() -> new RuntimeException("Alumni record not found: " + alumniId));
+        // Capture student reference and PK before deleting alumni
+        Student student = alumni.getStudent();
+        Integer alumniPk = alumni.getIndex();
+        // Delete alumni record first to release the FK constraint on student
+        alumniRepository.deleteById(alumniPk);
+        alumniRepository.flush();
+        // Then revert student status
+        if (student != null) {
+            student.setCurrentStatus(Student.StudentStatus.Active);
+            studentRepository.save(student);
+        }
+    }
 }

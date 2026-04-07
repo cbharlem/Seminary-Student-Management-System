@@ -221,6 +221,37 @@ class ScheduleController {
         }
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> update(@PathVariable String id, @RequestBody Map<String, String> body) {
+        try {
+            Schedule schedule = scheduleRepository.findByScheduleId(id)
+                .orElseThrow(() -> new RuntimeException("Schedule not found"));
+            schedule.setSection(sectionRepository.findBySectionId(body.get("sectionId"))
+                .orElseThrow(() -> new RuntimeException("Section not found")));
+            schedule.setCourse(courseRepository.findByCourseId(body.get("courseId"))
+                .orElseThrow(() -> new RuntimeException("Course not found")));
+            instructorRepository.findByInstructorId(body.get("instructorId")).ifPresent(schedule::setInstructor);
+            roomRepository.findByRoomId(body.get("roomId")).ifPresent(schedule::setRoom);
+            if (body.get("dayOfWeek") == null)
+                throw new RuntimeException("Day of week is required.");
+            schedule.setDayOfWeek(Schedule.DayOfWeek.valueOf(body.get("dayOfWeek")));
+            if (body.get("timeStart") == null || body.get("timeEnd") == null)
+                throw new RuntimeException("Start time and end time are required.");
+            schedule.setTimeStart(java.time.LocalTime.parse(body.get("timeStart")));
+            schedule.setTimeEnd(java.time.LocalTime.parse(body.get("timeEnd")));
+            return ResponseEntity.ok(scheduleService.update(schedule, id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid day of week value."));
+        } catch (DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid time format. Use HH:mm (e.g. 08:00)."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "An unexpected error occurred."));
+        }
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> delete(@PathVariable String id) {

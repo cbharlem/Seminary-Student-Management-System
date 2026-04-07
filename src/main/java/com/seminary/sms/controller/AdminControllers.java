@@ -237,6 +237,17 @@ class AlumniController {
         alumni.setAlumniId(id);
         return ResponseEntity.ok(alumniService.update(alumni));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> unmarkAlumni(@PathVariable String id) {
+        try {
+            alumniService.unmarkAlumni(id);
+            return ResponseEntity.ok(Map.of("message", "Alumni record removed and student reactivated."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }
 
 // ── User Management ────────────────────────────────────────────────────────────
