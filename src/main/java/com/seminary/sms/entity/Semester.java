@@ -1,5 +1,21 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Semester)
+// Maps to the database table: tblsemester
+// Represents one semester within a school year (e.g., "First Semester 2024-2025").
+// Stores the semester number, label, start and end dates, and active flag.
+// Only one semester should be marked active at a time — the system uses
+// the active semester as the default context for enrollment and grades.
+//
+// Relationships:
+//   @ManyToOne → SchoolYear   (each semester belongs to one school year)
+//
+// LAYER 5 → LAYER 4: SemesterRepository queries tblsemester using this entity.
+// LAYER 4 → LAYER 5: Queries return Semester objects (including the active semester lookup).
+// LAYER 5 → LAYER 2: Multiple controllers use the active semester to scope their data.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;

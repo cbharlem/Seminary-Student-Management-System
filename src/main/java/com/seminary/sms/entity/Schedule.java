@@ -1,5 +1,23 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Schedule)
+// Maps to the database table: tblschedule
+// Represents one class meeting slot — a specific course, taught by an instructor,
+// held in a room, on a day of the week, at a given start and end time.
+// Each schedule belongs to a section (a group of students).
+//
+// Relationships:
+//   @ManyToOne → Section     (the student section this schedule belongs to)
+//   @ManyToOne → Course      (the subject being taught)
+//   @ManyToOne → Instructor  (the teacher assigned to this slot)
+//   @ManyToOne → Room        (the classroom where the class is held)
+//
+// LAYER 5 → LAYER 4: ScheduleRepository queries tblschedule using this entity.
+// LAYER 4 → LAYER 5: Queries return Schedule objects (including conflict-check queries).
+// LAYER 5 → LAYER 3: ScheduleService validates conflicts before saving a schedule.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;

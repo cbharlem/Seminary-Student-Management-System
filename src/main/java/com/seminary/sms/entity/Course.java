@@ -1,5 +1,19 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Course)
+// Maps to the database table: tblcourses
+// Represents a subject or course that belongs to a program (e.g., "Philosophy 101").
+// Stores the course code, name, number of units, year level, and semester it belongs to.
+//
+// Relationships:
+//   @ManyToOne → Program   (many courses belong to one academic program)
+//
+// LAYER 5 → LAYER 4: CourseRepository queries tblcourses using this entity.
+// LAYER 4 → LAYER 5: Queries return Course objects.
+// LAYER 5 → LAYER 2: CurriculumController and EnrollmentController use Course objects.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,6 +42,8 @@ public class Course {
     @Column(name = "fldUnits", nullable = false, columnDefinition = "TINYINT")
     private Integer units;
 
+    // Many courses can belong to the same program — fldProgramIndex is the foreign key column
+    // FetchType.LAZY defers loading the Program object until it is actually needed
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fldProgramIndex", nullable = false)
     @ToString.Exclude @EqualsAndHashCode.Exclude
@@ -49,8 +65,11 @@ public class Course {
     @Column(name = "fldUpdatedAt", nullable = false)
     private LocalDateTime updatedAt;
 
+    // Called automatically by Hibernate just before a new row is INSERTed
     @PrePersist
     protected void onCreate() { createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }
+
+    // Called automatically by Hibernate just before an existing row is UPDATEd
     @PreUpdate
     protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 }

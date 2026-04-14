@@ -1,5 +1,22 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (StudentSection)
+// Maps to the database table: tblstudentsection
+// This is a join/assignment table that records which section a student belongs to
+// in a given semester. It links a Student to a Section for one Semester.
+// When a student is enrolled, they are also assigned to a section through this table.
+//
+// Relationships:
+//   @ManyToOne → Student    (the student being assigned)
+//   @ManyToOne → Section    (the section they are placed in)
+//   @ManyToOne → Semester   (the semester this assignment is for)
+//
+// LAYER 5 → LAYER 4: StudentSectionRepository queries tblstudentsection using this entity.
+// LAYER 4 → LAYER 5: Queries return StudentSection objects.
+// LAYER 5 → LAYER 3: EnrollmentService creates a StudentSection record during enrollment.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;

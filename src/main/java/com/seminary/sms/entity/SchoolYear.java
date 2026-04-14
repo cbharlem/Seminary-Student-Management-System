@@ -1,5 +1,20 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (SchoolYear)
+// Maps to the database table: tblschoolyear
+// Represents one academic school year (e.g., "2024-2025").
+// Only one school year should be marked as active at a time.
+// Semesters belong to a school year via a @ManyToOne on the Semester side.
+//
+// Relationships:
+//   (none — SchoolYear is referenced by Semester and Application via @ManyToOne on their side)
+//
+// LAYER 5 → LAYER 4: SchoolYearRepository queries tblschoolyear using this entity.
+// LAYER 4 → LAYER 5: Queries return SchoolYear objects.
+// LAYER 5 → LAYER 2: SchoolYearController manages school year and semester records.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;

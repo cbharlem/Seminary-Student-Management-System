@@ -1,5 +1,30 @@
 package com.seminary.sms.controller;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 2 — CONTROLLER (MeController)
+// Handles URL group: /api/me
+// Available to any authenticated user (both Registrar and Student).
+//
+// These endpoints allow the currently logged-in user to manage their own account.
+// The identity of the current user is read from the Authentication object that
+// Spring Security automatically injects — no user ID is passed in the URL,
+// which prevents one user from accessing another user's profile (IDOR prevention).
+//
+// Endpoints handled:
+//   GET  /api/me               → returns the logged-in user's userId, username, role
+//   GET  /api/me/photo         → returns the user's profile picture as image bytes
+//   POST /api/me/photo         → uploads/replaces the profile picture (images only, max 2 MB)
+//   PATCH /api/me/username     → changes the user's own username (checks for duplicates)
+//   PATCH /api/me/password     → changes the user's password (requires current password,
+//                                enforces complexity: length, uppercase, lowercase, number, symbol)
+//
+// Repositories used:
+//   UserRepository — to look up and save the current user's record
+//
+// LAYER 2 → LAYER 4: Calls UserRepository directly (no service needed — logic is simple).
+// LAYER 2 → LAYER 1: Returns JSON responses consumed by the profile page in the frontend.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.seminary.sms.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -29,6 +54,9 @@ public class MeController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js init() immediately on page load to identify the logged-in user
+    // LAYER 2 → LAYER 4: Uses Spring Security's Authentication object to find the username, then calls UserRepository
+    // LAYER 2 → LAYER 1: Returns userId, username, role, and isActive — the frontend stores this in SMS.currentUser
     // ── Who am I ─────────────────────────────────────────────────
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(Authentication auth) {
@@ -46,6 +74,9 @@ public class MeController {
             .orElse(ResponseEntity.status(401).body(Map.of("error", "User not found")));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js init() and loadMyProfile() to display the user's profile picture
+    // LAYER 2 → LAYER 4: Fetches the User record, reads the profilePicture blob field
+    // LAYER 2 → LAYER 1: Returns the raw image bytes with the correct Content-Type header (e.g., image/jpeg)
     // ── Profile Picture — GET ─────────────────────────────────────
     @GetMapping("/me/photo")
     public ResponseEntity<byte[]> getPhoto(Authentication auth) {
@@ -61,6 +92,9 @@ public class MeController {
             .body(user.getProfilePicture());
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js uploadProfilePic() when the user selects a new photo
+    // LAYER 2 → LAYER 4: Validates file type and size, then stores the bytes in the User entity's profilePicture field
+    // LAYER 2 → LAYER 1: Returns a success message, or 400 if the file type or size is invalid
     // ── Profile Picture — POST ────────────────────────────────────
     @PostMapping(value = "/me/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadPhoto(Authentication auth,
@@ -91,6 +125,9 @@ public class MeController {
             .orElse(ResponseEntity.status(401).body(Map.of("error", "User not found")));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js changeMyUsername() when the user submits the username change form
+    // LAYER 2 → LAYER 4: Checks for duplicates, then updates the username in the User record via UserRepository
+    // LAYER 2 → LAYER 1: Returns a success message reminding the user to re-login, or 400 if the name is taken
     // ── Change Username ───────────────────────────────────────────
     @PatchMapping("/me/username")
     public ResponseEntity<?> changeUsername(Authentication auth,
@@ -117,6 +154,9 @@ public class MeController {
             .orElse(ResponseEntity.status(401).body(Map.of("error", "User not found")));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js changeMyPassword() when the user submits the password change form
+    // LAYER 2 → LAYER 4: Verifies the current password with BCrypt, enforces complexity rules, then saves the new hash
+    // LAYER 2 → LAYER 1: Returns a success message, or 400 if the current password is wrong or complexity rules fail
     // ── Change Password ───────────────────────────────────────────
     @PatchMapping("/me/password")
     public ResponseEntity<?> changePassword(Authentication auth,

@@ -1,5 +1,21 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Section)
+// Maps to the database table: tblsection
+// Represents a class section — a named group of students in a specific program,
+// year level, and semester (e.g., "1-A Philosophy 2024-2025 Sem 1").
+// Sections are used to assign students to a schedule block.
+//
+// Relationships:
+//   @ManyToOne → Program    (the academic program this section belongs to)
+//   @ManyToOne → Semester   (the semester this section is active in)
+//
+// LAYER 5 → LAYER 4: SectionRepository queries tblsection using this entity.
+// LAYER 4 → LAYER 5: Queries return Section objects.
+// LAYER 5 → LAYER 2: SectionController manages sections; ScheduleController links them to schedules.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;

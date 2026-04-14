@@ -1,5 +1,27 @@
 package com.seminary.sms.config;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG / SUPPORT — LoginAttemptService
+// This is not part of any numbered layer. It is a security support component
+// that protects the login form against brute-force attacks.
+//
+// What it does:
+//   Tracks how many consecutive failed login attempts each username has made.
+//   After 5 failed attempts, the account is locked out for 15 minutes.
+//   All tracking is done in memory (ConcurrentHashMap) — no database table needed.
+//
+// How it works:
+//   loginFailed(username)         → increments the counter for that username.
+//                                   If count reaches 5, records a lock-out timestamp.
+//   loginSucceeded(username)      → clears the counter and any lock-out for that username.
+//   isBlocked(username)           → returns true if the account is still locked.
+//                                   Also auto-clears the lock if the 15-minute window has passed.
+//   getRemainingAttempts(username)→ returns how many attempts are left before lockout.
+//
+// This service is used by SecurityConfig — it is called inside a custom filter
+// that intercepts POST /login before Spring Security processes the credentials.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;

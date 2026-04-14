@@ -1,5 +1,29 @@
 package com.seminary.sms.controller;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 2 — CONTROLLER (DashboardController)
+// Handles the URL: GET /api/dashboard/stats
+// Restricted to users with the Registrar role (@PreAuthorize).
+//
+// This controller gathers summary statistics for the admin dashboard homepage:
+//   - Total active students
+//   - Total applicants
+//   - Number of active courses
+//   - Total alumni
+//   - Recent enrollments for the active semester (up to 5)
+//   - Student count broken down by program
+//
+// It talks directly to several repositories because this is a read-only
+// data aggregation endpoint — no business logic or writes are involved.
+//
+// Repositories used:
+//   StudentRepository, ApplicantRepository, CourseRepository,
+//   AlumniRepository, EnrollmentRepository, SemesterRepository, ProgramRepository
+//
+// LAYER 2 → LAYER 4: Calls repositories directly to count and list records.
+// LAYER 2 → LAYER 1: Returns a JSON map of stats that the dashboard page displays.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +48,10 @@ public class DashboardController {
     private final SemesterRepository semesterRepository;
     private final ProgramRepository programRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadDashboard() when the registrar opens the Dashboard page
+    // LAYER 2 → LAYER 4: Calls multiple repositories directly to count students, applicants, courses, and alumni,
+    //   and to fetch recent enrollments and the active semester's program breakdown
+    // LAYER 2 → LAYER 1: Returns a single JSON map containing all stats the dashboard card tiles display
     @GetMapping("/dashboard/stats")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Map<String, Object>> getStats() {

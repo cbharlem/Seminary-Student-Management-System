@@ -1,5 +1,21 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Report)
+// Maps to the database table: tblreports
+// Records each report that was generated in the system (e.g., Transcript of Records,
+// Grade Card, CHED Report). Tracks who generated it, when, and in what format (PDF/XLSX).
+//
+// Relationships:
+//   @ManyToOne → Student    (the student the report is about; optional for system-wide reports)
+//   @ManyToOne → Semester   (the semester the report covers; optional)
+//   @ManyToOne → User       (the registrar who generated the report)
+//
+// LAYER 5 → LAYER 4: ReportRepository queries tblreports using this entity.
+// LAYER 4 → LAYER 5: Queries return Report objects.
+// LAYER 5 → LAYER 2: Controllers use Report to log and retrieve generated report records.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;

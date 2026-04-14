@@ -1,5 +1,22 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Applicant)
+// Maps to the database table: tblapplicants
+// Represents a person who has applied to the seminary but is not yet a student.
+// Stores personal info, family background, and school history of the applicant.
+//
+// Relationships:
+//   @ManyToOne → Program   (the program the applicant applied for)
+//
+// Also contains a @Transient field "applicationStatus" — this field is NOT saved
+// to the database. It is filled in at runtime by a query.
+//
+// LAYER 5 → LAYER 4: ApplicantRepository uses this entity to query tblapplicants.
+// LAYER 4 → LAYER 5: Queries return Applicant objects.
+// LAYER 5 → LAYER 3: ApplicantService receives and processes Applicant objects.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -49,6 +66,8 @@ public class Applicant {
     @Column(name = "fldSeminaryLevel")
     private SeminaryLevel seminaryLevel;
 
+    // Many applicants can apply to the same program — fldProgramIndex is the foreign key column
+    // FetchType.LAZY defers loading the Program object until it is actually needed
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fldProgramIndex")
     @ToString.Exclude @EqualsAndHashCode.Exclude
@@ -57,12 +76,18 @@ public class Applicant {
     @Column(name = "fldCreatedAt", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "fldUpdatedAt", nullable = false)                    private LocalDateTime updatedAt;
 
-    // Populated at query time — not stored in DB
+    // @Transient — NOT saved to the database
+    // Populated at runtime by joining with the Application table so callers can see the applicant's status
     @Transient
     private String applicationStatus;
 
+    // Called automatically by Hibernate just before a new row is INSERTed
+    // Sets both timestamps to right now so the record always has a creation time
     @PrePersist
     protected void onCreate() { createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }
+
+    // Called automatically by Hibernate just before an existing row is UPDATEd
+    // Keeps updatedAt current so we always know when the applicant's record was last modified
     @PreUpdate
     protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 

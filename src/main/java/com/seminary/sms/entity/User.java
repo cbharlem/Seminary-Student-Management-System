@@ -1,5 +1,24 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (User)
+// Maps to the database table: tblusers
+// Represents a login account in the system. Every person who can log in
+// (whether a Registrar or a Student) has a User record.
+// Stores the username, hashed password (never plain text), role, active status,
+// and optional profile picture stored as binary data (LONGBLOB).
+//
+// The @JsonIgnore annotations on passwordHash and profilePicture ensure these
+// sensitive fields are NEVER sent to the browser in an API response.
+//
+// Relationships:
+//   (none — User is referenced by Student, Grade, BackupLog, Report via @ManyToOne)
+//
+// LAYER 5 → LAYER 4: UserRepository queries tblusers using this entity.
+// LAYER 4 → LAYER 5: Queries return User objects.
+// LAYER 5 → LAYER 2: MeController and UserController use User for profile and account management.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;

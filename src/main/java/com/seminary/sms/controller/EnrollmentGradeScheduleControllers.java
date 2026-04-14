@@ -1,5 +1,31 @@
 package com.seminary.sms.controller;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 2 — CONTROLLER (EnrollmentGradeScheduleControllers.java)
+// This file bundles three controllers that handle the core academic operations:
+//
+//   EnrollmentController  → @RequestMapping("/api/enrollment")
+//      Handles enrolling students in semesters and adding subjects to enrollments.
+//      Delegates complex logic to EnrollmentService.
+//      Also uses: StudentRepository, ProgramRepository, SemesterRepository,
+//                 SectionRepository, CourseRepository, EnrollmentRepository
+//
+//   GradeController       → @RequestMapping("/api/grades")
+//      Handles viewing, saving, and updating student grades.
+//      Delegates to GradeService for computation and saving.
+//      Also uses: GradeRepository, UserRepository (to identify who entered the grade)
+//
+//   ScheduleController    → @RequestMapping("/api/schedule")
+//      Handles creating, updating, and deleting class schedules.
+//      Delegates conflict detection and saving to ScheduleService.
+//      Also uses: ScheduleRepository, SectionRepository, InstructorRepository,
+//                 RoomRepository, CourseRepository
+//
+// LAYER 2 → LAYER 3: All three controllers delegate business logic to their respective services.
+// LAYER 2 → LAYER 4: Also calls repositories directly for simple lookups (e.g., find by ID).
+// LAYER 2 → LAYER 1: Returns JSON responses that the frontend (app.js) uses to update the UI.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import com.seminary.sms.service.*;
@@ -29,6 +55,9 @@ class EnrollmentController {
     private final SectionRepository sectionRepository;
     private final CourseRepository courseRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadEnrollment() to populate the enrollment table
+    // LAYER 2 → LAYER 3: Delegates to enrollmentService.getBySemester() if a semester filter is provided
+    // LAYER 2 → LAYER 1: Returns a JSON list of Enrollment records matching the filter
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public List<Enrollment> getAll(@RequestParam(required = false) String semester) {
@@ -36,12 +65,18 @@ class EnrollmentController {
         return enrollmentRepository.findAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js viewStudent() to load enrollment history in the student detail panel
+    // LAYER 2 → LAYER 3: Delegates to enrollmentService.getEnrollmentsByStudent()
+    // LAYER 2 → LAYER 1: Returns a JSON list of all enrollments for this student across all semesters
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Enrollment> getByStudent(@PathVariable String studentId) {
         return enrollmentService.getEnrollmentsByStudent(studentId);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveEnrollment() when the registrar enrolls a student
+    // LAYER 2 → LAYER 3: Resolves all references (student, program, semester, section) then delegates to enrollmentService.enroll()
+    // LAYER 2 → LAYER 1: Returns the new Enrollment JSON, or 400 if already enrolled or year level is out of range
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> enroll(@RequestBody Map<String, String> body) {
@@ -66,12 +101,19 @@ class EnrollmentController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js refreshSubjectsTable() to load the subjects in an enrollment
+    // LAYER 2 → LAYER 3: Delegates to enrollmentService.getSubjectsByEnrollment()
+    // LAYER 2 → LAYER 1: Returns a JSON list of EnrollmentSubject objects for this enrollment
     @GetMapping("/{enrollmentId}/subjects")
     @PreAuthorize("hasRole('Registrar')")
     public List<EnrollmentSubject> getSubjects(@PathVariable String enrollmentId) {
         return enrollmentService.getSubjectsByEnrollment(enrollmentId);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js addEnrollmentSubject() when the registrar adds a subject to an enrollment
+    // LAYER 2 → LAYER 3: Resolves the enrollment and course, then delegates to enrollmentService.enrollSubject()
+    //   which also checks prerequisites before saving
+    // LAYER 2 → LAYER 1: Returns the new EnrollmentSubject JSON, or 400 if prerequisites are not met
     @PostMapping("/{enrollmentId}/subjects")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> enrollSubject(@PathVariable String enrollmentId,
@@ -101,6 +143,9 @@ class GradeController {
     private final GradeService gradeService;
     private final UserRepository userRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadGrades() to populate the grades management table
+    // LAYER 2 → LAYER 3: Delegates to gradeService.getGradesBySemester() if filtered, otherwise returns all
+    // LAYER 2 → LAYER 1: Returns a JSON list of Grade records
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public List<Grade> getAll(@RequestParam(required = false) String semester) {
@@ -108,6 +153,9 @@ class GradeController {
         return gradeRepository.findAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js viewStudent() to show a student's grades in the detail panel
+    // LAYER 2 → LAYER 3: Delegates to gradeService filtered by student and optionally by semester
+    // LAYER 2 → LAYER 1: Returns a JSON list of Grade records for the specified student
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Grade> getByStudent(@PathVariable String studentId,
@@ -116,6 +164,10 @@ class GradeController {
         return gradeService.getGradesByStudent(studentId);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js when a new grade record is first created
+    // LAYER 2 → LAYER 3: Identifies the logged-in user, then delegates to gradeService.saveGrade()
+    //   which assigns the grade ID, computes the final rating, and syncs the enrollment subject status
+    // LAYER 2 → LAYER 1: Returns the saved Grade JSON
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> save(@RequestBody Grade grade, Authentication auth) {
@@ -130,6 +182,9 @@ class GradeController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveGrade() when the registrar edits an existing grade
+    // LAYER 2 → LAYER 3: Validates midterm/final grade ranges, validates the status enum, then delegates to gradeService.updateGrade()
+    // LAYER 2 → LAYER 1: Returns the updated Grade JSON, or 400 if grades are out of range or status is invalid
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> update(@PathVariable Integer id,
@@ -179,6 +234,9 @@ class ScheduleController {
     private final RoomRepository roomRepository;
     private final CourseRepository courseRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadSchedule() and loadScheduleGrid() to show class schedules
+    // LAYER 2 → LAYER 3: Delegates to scheduleService.getBySection() if filtered, otherwise returns all
+    // LAYER 2 → LAYER 1: Returns a JSON list of Schedule objects
     @GetMapping
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Schedule> getAll(@RequestParam(required = false) String section) {
@@ -186,6 +244,10 @@ class ScheduleController {
         return scheduleRepository.findAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveSchedule() when creating a new class schedule
+    // LAYER 2 → LAYER 3: Builds the Schedule object from the request body, then delegates to scheduleService.save()
+    //   which runs conflict detection before saving
+    // LAYER 2 → LAYER 1: Returns the saved Schedule JSON, or 400 if there is a room or instructor conflict
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> create(@RequestBody Map<String, String> body) {
@@ -221,6 +283,10 @@ class ScheduleController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveSchedule() when editing an existing class schedule
+    // LAYER 2 → LAYER 3: Rebuilds the Schedule from the request body, then delegates to scheduleService.update()
+    //   which re-runs conflict detection excluding the current schedule from the check
+    // LAYER 2 → LAYER 1: Returns the updated Schedule JSON, or 400 if a conflict is detected
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> update(@PathVariable String id, @RequestBody Map<String, String> body) {
@@ -252,6 +318,9 @@ class ScheduleController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js doDeleteSchedule() when the registrar confirms schedule deletion
+    // LAYER 2 → LAYER 3: Delegates to scheduleService.delete() which calls deleteByScheduleId() on the repository
+    // LAYER 2 → LAYER 1: Returns a simple success message JSON
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> delete(@PathVariable String id) {

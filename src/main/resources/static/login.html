@@ -1,4 +1,27 @@
 <!DOCTYPE html>
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- LAYER 1 — FRONTEND (login.html)                                         -->
+<!-- This is the login page — the entry point for all users.                 -->
+<!-- It is a static HTML file served directly by Spring Boot without         -->
+<!-- requiring authentication (it is on the public URL whitelist in          -->
+<!-- SecurityConfig).                                                         -->
+<!--                                                                         -->
+<!-- How it works:                                                            -->
+<!--   - Displays a username and password form.                              -->
+<!--   - The form POSTs to /login — this is handled entirely by             -->
+<!--     Spring Security (not a controller you wrote). Spring checks         -->
+<!--     the credentials against the database via UserDetailsService.        -->
+<!--   - On success → Spring redirects to /index.html.                       -->
+<!--   - On failure → Spring redirects back here with ?error=true            -->
+<!--     and optionally ?attempts=N (remaining tries) or ?blocked=true       -->
+<!--     (account locked after 5 failed attempts).                           -->
+<!--   - Also shows the active semester label fetched from                   -->
+<!--     GET /api/public/active-semester (no login required).                -->
+<!--                                                                         -->
+<!-- LAYER 1 → LAYER 2: The form submits credentials to POST /login          -->
+<!--   (handled by Spring Security, not a custom controller).                -->
+<!--   Also calls GET /api/public/active-semester to show the semester badge.-->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>

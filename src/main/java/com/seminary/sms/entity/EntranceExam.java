@@ -1,5 +1,20 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (EntranceExam)
+// Maps to the database table: tblentranceexam
+// Records the result of an entrance exam taken by an applicant.
+// Stores the exam date, score, maximum possible score, result (Passed/Failed/Pending),
+// and any remarks from the examiner.
+//
+// Relationships:
+//   @ManyToOne → Applicant   (an applicant can take multiple exams; each exam links to one applicant)
+//
+// LAYER 5 → LAYER 4: EntranceExamRepository queries tblentranceexam using this entity.
+// LAYER 4 → LAYER 5: Queries return EntranceExam objects.
+// LAYER 5 → LAYER 3: ApplicantService uses this to record and retrieve exam results.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,6 +36,8 @@ public class EntranceExam {
     @Column(name = "fldExamID", nullable = false, unique = true, length = 30)
     private String examId;
 
+    // An applicant can take multiple exams — fldApplicantIndex is the foreign key
+    // FetchType.LAZY defers loading the Applicant object until it is actually needed
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fldApplicantIndex", nullable = false)
     @ToString.Exclude @EqualsAndHashCode.Exclude
@@ -40,8 +57,11 @@ public class EntranceExam {
     @Column(name = "fldCreatedAt", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "fldUpdatedAt", nullable = false)                    private LocalDateTime updatedAt;
 
+    // Called automatically by Hibernate just before a new row is INSERTed
     @PrePersist
     protected void onCreate() { createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }
+
+    // Called automatically by Hibernate just before an existing row is UPDATEd
     @PreUpdate
     protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 

@@ -253,6 +253,13 @@ async function loadEnrollment() {
   } catch (e) { console.error(e); }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — FRONTEND (app.js)
+// LAYER 1 → LAYER 2: This function sends an HTTP GET request to the Controller
+//   at /api/students. The Controller (Layer 2) receives it and decides what to do.
+// LAYER 2 → LAYER 1: The Controller sends back a JSON list of students.
+//   renderStudentTable() below receives that JSON and displays it on screen.
+// ─────────────────────────────────────────────────────────────────────────────
 async function loadStudents() {
   try {
     const program = document.getElementById('filter-program')?.value;
@@ -260,7 +267,9 @@ async function loadStudents() {
     let url = '/api/students?';
     if (program) url += `program=${program}&`;
     if (status)  url += `status=${status}&`;
+    // LAYER 1 → LAYER 2: Sends GET /api/students to StudentController.getAll()
     const data = await api(url);
+    // LAYER 2 → LAYER 1: 'data' is the JSON the Controller sent back — now render it
     renderStudentTable(data);
   } catch (e) { console.error(e); }
 }
@@ -268,11 +277,16 @@ async function loadStudents() {
 async function searchStudents(q) {
   if (q.length < 2) { loadStudents(); return; }
   try {
+    // LAYER 1 → LAYER 2: Sends GET /api/students?q=... to StudentController.getAll()
     const data = await api(`/api/students?q=${encodeURIComponent(q)}`);
+    // LAYER 2 → LAYER 1: 'data' is the JSON list of matching students
     renderStudentTable(data);
   } catch (e) { console.error(e); }
 }
 
+// LAYER 2 → LAYER 1: This function receives the final JSON from the Controller
+//   and turns it into HTML rows on screen. Each field (s.studentId, s.firstName, etc.)
+//   came from the Student entity (Layer 5) all the way up through the layers.
 function renderStudentTable(data) {
   const tbody = document.getElementById('tbl-students');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No students found.</p></div></td></tr>'; return; }

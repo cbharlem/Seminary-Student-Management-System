@@ -6,19 +6,30 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Student)
+// This class IS the database table in Java form. Every field here maps to
+//   a column in the actual database table.
+// LAYER 4 → LAYER 5: Repository uses this class to know what table and columns
+//   exist so it can build the correct SQL queries automatically.
+// LAYER 5 → LAYER 4: When the database returns a row, Spring maps each column
+//   back to the matching field in this class to build a Student object.
+// LAYER 5 → LAYER 1: This object travels up through Repository → Service →
+//   Controller, where Spring converts it to JSON and sends it to the browser.
+// ─────────────────────────────────────────────────────────────────────────────
 @Entity
-@Table(name = "tblstudents")
+@Table(name = "tblstudents") // maps this class to the tblstudents database table
 @Data @NoArgsConstructor @AllArgsConstructor @Builder
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Student {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "fldIndex")
+    @Column(name = "fldIndex") // primary key — the row number in the table
     private Integer index;
 
     @Column(name = "fldStudentID", nullable = false, unique = true, length = 30)
-    private String studentId;
+    private String studentId; // maps to fldStudentID column
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fldApplicationIndex", nullable = false, unique = true)
@@ -74,6 +85,12 @@ public class Student {
     @Column(name = "fldCurrentStatus", nullable = false)
     private StudentStatus currentStatus = StudentStatus.Active;
 
+    // LAYER 5 → LAYER 5: This field links Student to the Program entity.
+    // @ManyToOne — many students belong to one program
+    // @JoinColumn — the foreign key column in tblstudents that stores the program's index
+    // When Repository fetches a Student, Spring automatically follows this link,
+    //   queries tblprogram, and puts the full Program object here instead of just a number.
+    // LAYER 5 → LAYER 1: The Program object inside here becomes program: {...} in the JSON
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fldProgramIndex", nullable = false)
     @ToString.Exclude @EqualsAndHashCode.Exclude

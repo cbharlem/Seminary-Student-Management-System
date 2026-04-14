@@ -1,3 +1,29 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — FRONTEND HELPER (api.js)
+// This file is the bridge between the browser UI and the Spring Boot backend.
+// It is loaded by index.html and used throughout app.js.
+//
+// What it does:
+//   - Holds shared application state (current user, role, active semester)
+//     in the SMS object so all other JavaScript can access it.
+//   - Provides a central apiFetch() function that all API calls go through.
+//     This function automatically attaches the correct headers, handles
+//     HTTP errors, and parses JSON responses.
+//   - Contains utility/helper functions used across the whole frontend
+//     (e.g., formatting dates, building HTML elements, showing notifications).
+//
+// How it connects to Layer 2:
+//   Every time app.js needs data (e.g., load the student list, save a grade,
+//   enroll a student), it calls a function in api.js which sends an HTTP
+//   request to a Spring Boot REST controller endpoint.
+//   The controller processes it and returns a JSON response, which api.js
+//   passes back to app.js to display on screen.
+//
+// LAYER 1 → LAYER 2: Sends HTTP requests (GET/POST/PUT/PATCH/DELETE) to
+//   REST API endpoints like /api/students, /api/grades, /api/enrollment, etc.
+// LAYER 2 → LAYER 1: Receives JSON responses and returns them to the caller.
+// ─────────────────────────────────────────────────────────────────────────────
+
 /* ============================================================
    SMS — api.js
    API helper, utility functions, shared state
@@ -11,6 +37,13 @@ const SMS = {
 };
 
 // ── API Helper ───────────────────────────────────────────────
+// LAYER 1 → LAYER 2: This is the single function all of app.js uses to talk to the backend.
+//   Every GET/POST/PUT/PATCH/DELETE request goes through here.
+//   It sends an HTTP request to a Spring Boot controller endpoint (Layer 2)
+//   and returns the parsed JSON response back to whoever called it.
+// LAYER 2 → LAYER 1: If the response is 401 (session expired), it redirects to login.
+//   If the response is an error, it throws so the caller can handle it.
+//   If the response is OK, it returns the parsed JSON data.
 async function api(url, method = 'GET', body = null) {
   const headers = { 'Content-Type': 'application/json' };
 

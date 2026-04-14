@@ -1,5 +1,20 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (Program)
+// Maps to the database table: tblprogram
+// Represents an academic program offered by the seminary (e.g., "Bachelor of Philosophy").
+// Stores the program code, full name, total units required, duration, and active status.
+//
+// Relationships:
+//   (none — Program is referenced by many other entities via @ManyToOne on their side,
+//    such as Course, Section, Enrollment, Alumni, and Applicant)
+//
+// LAYER 5 → LAYER 4: ProgramRepository queries tblprogram using this entity.
+// LAYER 4 → LAYER 5: Queries return Program objects.
+// LAYER 5 → LAYER 2: Multiple controllers use Program to filter courses, sections, and students.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;

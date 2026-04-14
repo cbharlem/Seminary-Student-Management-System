@@ -1,5 +1,20 @@
 package com.seminary.sms.entity;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 5 — ENTITY (BackupLog)
+// Maps to the database table: tblbackuplog
+// Records each database backup that was performed — when it happened,
+// what file was created, what type it was (Manual or Scheduled),
+// and which User triggered it.
+//
+// Relationships:
+//   @ManyToOne → User   (the admin who performed the backup)
+//
+// LAYER 5 → LAYER 4: BackupLogRepository queries tblbackuplog using this entity.
+// LAYER 4 → LAYER 5: Queries return BackupLog objects.
+// LAYER 5 → LAYER 2: BackupController reads these objects to show the backup history.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -25,6 +40,8 @@ public class BackupLog {
     @Builder.Default
     private BackupType backupType = BackupType.Manual;
 
+    // Many backup log entries can be created by the same user — fldPerformedByIndex is the foreign key
+    // FetchType.LAZY defers loading the User object until it is actually needed
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fldPerformedByIndex", nullable = false)
     @ToString.Exclude @EqualsAndHashCode.Exclude
@@ -32,6 +49,8 @@ public class BackupLog {
 
     @Column(name = "fldNotes", length = 255) private String notes;
 
+    // Called automatically by Hibernate just before a new row is INSERTed
+    // Sets backupDate to right now — this cannot be changed later (updatable = false on the column)
     @PrePersist
     protected void onCreate() { backupDate = LocalDateTime.now(); }
 

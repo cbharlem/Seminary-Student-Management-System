@@ -13,40 +13,59 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
-// ── Students ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 2 — CONTROLLER (StudentController)
+// LAYER 1 → LAYER 2: app.js sends HTTP requests to /api/students.
+//   This controller receives those requests and decides what to do with them.
+// LAYER 2 → LAYER 3: For complex logic (search), delegates to StudentService (Layer 3).
+//   For simple queries, calls StudentRepository (Layer 4) directly.
+// LAYER 4 → LAYER 2: Repository returns a List<Student> with Program objects inside.
+// LAYER 2 → LAYER 1: ResponseEntity.ok(...) wraps the list and Spring converts it
+//   to JSON automatically before sending it back to the browser.
+// ─────────────────────────────────────────────────────────────────────────────
 @RestController
 @RequestMapping("/api/students")
 @RequiredArgsConstructor
 class StudentController {
 
+    // LAYER 2 → LAYER 4: studentRepository talks directly to the database
     private final StudentRepository studentRepository;
+    // LAYER 2 → LAYER 3: studentService handles business logic before hitting the DB
     private final StudentService studentService;
     private final ProgramRepository programRepository;
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
 
+    // LAYER 1 → LAYER 2: Receives GET /api/students from app.js loadStudents()
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> getAll(@RequestParam(required = false) String q,
                                      @RequestParam(required = false) String program,
                                      @RequestParam(required = false) String status) {
         try {
+            // LAYER 2 → LAYER 3: Search is complex so it goes through the Service
             if (q != null && !q.isBlank()) return ResponseEntity.ok(studentService.searchStudents(q));
             if (status != null) {
                 // SECURITY (A08): Enum poisoning — validate status before valueOf to return 400 not 500
                 Student.StudentStatus st = Student.StudentStatus.valueOf(status);
                 if (program != null)
+                    // LAYER 2 → LAYER 4: Simple filter — goes straight to Repository
                     return ResponseEntity.ok(studentRepository.findByCurrentStatusAndProgram_ProgramId(st, program));
                 return ResponseEntity.ok(studentRepository.findByCurrentStatus(st));
             }
             if (program != null) return ResponseEntity.ok(studentRepository.findByProgram_ProgramId(program));
             // SECURITY (A05): Cap unfiltered results to prevent large query DoS
+            // LAYER 4 → LAYER 2: Repository returns List<Student>, Spring converts to JSON → back to Layer 1
             return ResponseEntity.ok(studentRepository.findAll(PageRequest.of(0, 500)).getContent());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid status value."));
         }
     }
 
+    // LAYER 1 → LAYER 2: Receives GET /api/students/{id} from app.js viewStudent()
+    // LAYER 2 → LAYER 4: Goes straight to Repository — no business logic needed
+    // LAYER 4 → LAYER 2 → LAYER 1: Repository returns Optional<Student>, Controller
+    //   unwraps it — if found returns 200 + student JSON, if not found returns 404
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #id)")
     public ResponseEntity<Student> getById(@PathVariable String id) {
@@ -55,6 +74,9 @@ class StudentController {
             .orElse(ResponseEntity.notFound().build());
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveStudent() when the registrar submits a new student form
+    // LAYER 2 → LAYER 3: Delegates saving to studentService.save() after auto-assigning the student ID
+    // LAYER 2 → LAYER 1: Returns the saved Student object as JSON (201-equivalent wrapped in 200)
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Student> create(@RequestBody Student student) {
@@ -64,6 +86,9 @@ class StudentController {
         return ResponseEntity.ok(studentService.save(student));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveStudent() when editing an existing student record
+    // LAYER 2 → LAYER 3: Delegates saving to studentService.save() after verifying the student exists
+    // LAYER 2 → LAYER 1: Returns the updated Student JSON, or 404 if the ID is not found
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Student> update(@PathVariable String id, @RequestBody Student student) {
@@ -73,6 +98,9 @@ class StudentController {
         return ResponseEntity.ok(studentService.save(student));
     }
 
+    // Converts the plain IDs sent from the browser (programId, applicationId, userId)
+    // into real JPA entity objects by looking them up in the database.
+    // This is needed because JSON only carries IDs — not full linked objects.
     private void resolveStudentRefs(Student student) {
         if (student.getProgram() != null && student.getProgram().getProgramId() != null)
             programRepository.findByProgramId(student.getProgram().getProgramId()).ifPresent(student::setProgram);
@@ -82,6 +110,9 @@ class StudentController {
             userRepository.findByUserId(student.getUser().getUserId()).ifPresent(student::setUser);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by a status change action in app.js (e.g., marking a student as Inactive)
+    // LAYER 2 → LAYER 3: Delegates to studentService.updateStatus() which finds the student and updates the field
+    // LAYER 2 → LAYER 1: Returns a simple JSON message confirming the update, or 400 on invalid status
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> updateStatus(@PathVariable String id, @RequestParam String status) {
@@ -109,6 +140,9 @@ class ApplicantController {
     private final StudentRepository studentRepository;
     private final StudentService studentService;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadApplicants() when the registrar opens the Applicants page
+    // LAYER 2 → LAYER 4: Fetches all applicants from the repository, then builds a status map from applications
+    // LAYER 2 → LAYER 1: Returns a JSON list of applicants with their application status attached
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public List<Applicant> getAll() {
@@ -125,12 +159,18 @@ class ApplicantController {
         return applicants;
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js viewApplicantDetail() when a row is clicked
+    // LAYER 2 → LAYER 4: Calls applicantRepository.findByApplicantId() to look up the specific record
+    // LAYER 2 → LAYER 1: Returns the Applicant JSON (200), or 404 if not found
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Applicant> getById(@PathVariable String id) {
         return applicantRepository.findByApplicantId(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveApplicant() when the Add Applicant form is submitted
+    // LAYER 2 → LAYER 3: Delegates to applicantService.save(), then auto-creates an Application record
+    // LAYER 2 → LAYER 1: Returns the saved Applicant JSON including the newly assigned applicantId
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Applicant> create(@RequestBody Applicant applicant) {
@@ -155,6 +195,9 @@ class ApplicantController {
         return ResponseEntity.ok(saved);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveApplicantEdit() when the registrar saves changes to an applicant
+    // LAYER 2 → LAYER 3: Fetches the existing record, updates fields manually, then delegates to applicantService.save()
+    // LAYER 2 → LAYER 1: Returns the updated Applicant JSON, or 404 if not found
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Applicant> update(@PathVariable String id, @RequestBody Applicant body) {
@@ -186,17 +229,25 @@ class ApplicantController {
         return ResponseEntity.ok(applicantService.save(existing));
     }
 
+    // Converts the programId from the JSON body into a real Program entity from the database.
+    // This is needed because the browser sends only the ID string, not the full object.
     private void resolveApplicantRefs(Applicant applicant) {
         if (applicant.getAppliedProgram() != null && applicant.getAppliedProgram().getProgramId() != null)
             programRepository.findByProgramId(applicant.getAppliedProgram().getProgramId()).ifPresent(applicant::setAppliedProgram);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js viewApplicantDetail() to load the applicant's application record
+    // LAYER 2 → LAYER 3: Delegates to applicantService.getApplicationByApplicant()
+    // LAYER 2 → LAYER 1: Returns the Application JSON (200), or 404 if no application exists yet
     @GetMapping("/{id}/application")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Application> getApplication(@PathVariable String id) {
         return applicantService.getApplicationByApplicant(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveApplicantEdit() when the registrar changes an application status
+    // LAYER 2 → LAYER 3: Delegates to applicantService.updateStatus() after validating the status enum
+    // LAYER 2 → LAYER 1: Returns the updated Application JSON, or 400 if the status string is invalid
     @PatchMapping("/applications/{appId}/status")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> updateAppStatus(@PathVariable String appId, @RequestParam String status) {
@@ -208,12 +259,18 @@ class ApplicantController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js viewApplicantDetail() to load the applicant's entrance exam history
+    // LAYER 2 → LAYER 3: Delegates to applicantService.getExamsByApplicant()
+    // LAYER 2 → LAYER 1: Returns a JSON list of EntranceExam records for this applicant
     @GetMapping("/{id}/exams")
     @PreAuthorize("hasRole('Registrar')")
     public List<EntranceExam> getExams(@PathVariable String id) {
         return applicantService.getExamsByApplicant(id);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveExam() when the registrar records an entrance exam result
+    // LAYER 2 → LAYER 3: Links the exam to the applicant, assigns a unique exam ID, then delegates to applicantService.recordExam()
+    // LAYER 2 → LAYER 1: Returns the saved EntranceExam JSON
     @PostMapping("/{id}/exams")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> recordExam(@PathVariable String id, @RequestBody EntranceExam exam) {
@@ -225,6 +282,10 @@ class ApplicantController {
         return ResponseEntity.ok(applicantService.recordExam(exam));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmAdmit() when the registrar admits a confirmed applicant
+    // LAYER 2 → LAYER 3/4: Validates the applicant, creates a Student record, and calls studentService.createWithAccount()
+    //   to create both the student record and a login account with a temporary password in one transaction
+    // LAYER 2 → LAYER 1: Returns the new studentId and temporaryPassword, which the registrar hands to the student
     @PostMapping("/{id}/admit")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> admit(@PathVariable String id, @RequestBody Map<String, Object> body) {

@@ -1,5 +1,44 @@
 package com.seminary.sms.controller;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 2 — CONTROLLER (AdminControllers.java)
+// This file contains several controllers bundled together, each handling
+// a different group of admin-only API endpoints:
+//
+//   CurriculumController   → @RequestMapping("/api/curriculum")
+//      Manages programs, courses, and prerequisite rules.
+//      Talks directly to: CourseRepository, ProgramRepository, PrerequisiteRepository
+//
+//   SectionController      → @RequestMapping("/api/sections")
+//      Manages sections, instructors, and rooms.
+//      Talks directly to: SectionRepository, InstructorRepository, RoomRepository,
+//                         ProgramRepository, SemesterRepository
+//
+//   AlumniController       → @RequestMapping("/api/alumni")
+//      Manages alumni records (graduate a student, update, or unmark as alumni).
+//      Delegates to: AlumniService (for business logic), AlumniRepository (for existence checks)
+//
+//   UserController         → @RequestMapping("/api/users")
+//      Manages user accounts (create, toggle active/inactive, generate temp password).
+//      Talks directly to: UserRepository
+//
+//   SchoolYearController   → @RequestMapping("/api/school-years")
+//      Manages school years and semesters (create, list, activate a semester).
+//      Talks directly to: SchoolYearRepository, SemesterRepository
+//
+//   PublicController       → @RequestMapping("/api/public")
+//      No authentication required. Provides the active semester label for the login page.
+//      Talks directly to: SemesterRepository
+//
+//   DocumentController     → @RequestMapping("/api/documents")
+//      Lists and deletes student document records.
+//      Talks directly to: DocumentRepository
+//
+// LAYER 2 → LAYER 3: AlumniController delegates to AlumniService for complex logic.
+// LAYER 2 → LAYER 4: Most controllers here talk directly to repositories for simple CRUD.
+// LAYER 2 → LAYER 1: All endpoints return JSON that the frontend (api.js / app.js) consumes.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import com.seminary.sms.service.AlumniService;
@@ -24,12 +63,18 @@ class CurriculumController {
     private final ProgramRepository programRepository;
     private final PrerequisiteRepository prerequisiteRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js when dropdowns or the curriculum page need the list of active programs
+    // LAYER 2 → LAYER 4: Calls programRepository.findByIsActiveTrue() — no service needed here
+    // LAYER 2 → LAYER 1: Returns a JSON list of active Program objects
     @GetMapping("/programs")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Program> getPrograms() {
         return programRepository.findByIsActiveTrue();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadCurriculum() to fill the curriculum table
+    // LAYER 2 → LAYER 4: Calls courseRepository filtered by program and active status
+    // LAYER 2 → LAYER 1: Returns a JSON list of Course objects matching the filter
     @GetMapping("/courses")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Course> getCourses(@RequestParam(required = false) String program) {
@@ -37,12 +82,18 @@ class CurriculumController {
         return courseRepository.findByIsActiveTrue();
     }
 
+    // LAYER 1 → LAYER 2: Called when displaying a course's prerequisite rules in the curriculum table
+    // LAYER 2 → LAYER 4: Calls prerequisiteRepository.findByCourse_CourseId()
+    // LAYER 2 → LAYER 1: Returns a JSON list of Prerequisite rules for the given course
     @GetMapping("/courses/{id}/prerequisites")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Prerequisite> getPrerequisites(@PathVariable String id) {
         return prerequisiteRepository.findByCourse_CourseId(id);
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveCourse() when a new course is added in the curriculum
+    // LAYER 2 → LAYER 4: Assigns a courseId, resolves the program reference, then calls courseRepository.save()
+    // LAYER 2 → LAYER 1: Returns the saved Course JSON
     @PostMapping("/courses")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Course> addCourse(@RequestBody Course course) {
@@ -52,6 +103,9 @@ class CurriculumController {
         return ResponseEntity.ok(courseRepository.save(course));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveCourse() when editing an existing course
+    // LAYER 2 → LAYER 4: Fetches the existing course, updates only non-null fields, then saves
+    // LAYER 2 → LAYER 1: Returns the updated Course JSON, or 404 if not found
     @PutMapping("/courses/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Course> updateCourse(@PathVariable String id, @RequestBody Course course) {
@@ -68,6 +122,9 @@ class CurriculumController {
         return ResponseEntity.ok(courseRepository.save(existing));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteCourse() when the registrar confirms deletion
+    // LAYER 2 → LAYER 4: Deletes all prerequisite rules for this course first, then deletes the course
+    // LAYER 2 → LAYER 1: Returns HTTP 204 No Content on success, or 404 if not found
     @DeleteMapping("/courses/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Void> deleteCourse(@PathVariable String id) {
@@ -79,6 +136,9 @@ class CurriculumController {
         return ResponseEntity.noContent().build();
     }
 
+    // LAYER 1 → LAYER 2: Triggered when the registrar links one course as a prerequisite of another
+    // LAYER 2 → LAYER 4: Resolves both course references from IDs, assigns a prerequisiteId, then saves
+    // LAYER 2 → LAYER 1: Returns the saved Prerequisite JSON
     @PostMapping("/prerequisites")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Prerequisite> addPrerequisite(@RequestBody Prerequisite prereq) {
@@ -90,6 +150,9 @@ class CurriculumController {
         return ResponseEntity.ok(prerequisiteRepository.save(prereq));
     }
 
+    // LAYER 1 → LAYER 2: Triggered when the registrar removes a prerequisite rule from a course
+    // LAYER 2 → LAYER 4: Calls prerequisiteRepository.deleteById() using the integer PK
+    // LAYER 2 → LAYER 1: Returns a simple success message JSON
     @DeleteMapping("/prerequisites/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> deletePrerequisite(@PathVariable Integer id) {
@@ -111,6 +174,9 @@ class SectionController {
     private final ProgramRepository programRepository;
     private final SemesterRepository semesterRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadSections() and dropdowns needing available sections
+    // LAYER 2 → LAYER 4: Calls sectionRepository filtered by semester if provided; filters to active only
+    // LAYER 2 → LAYER 1: Returns a JSON list of active Section objects
     @GetMapping
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Section> getSections(@RequestParam(required = false) String semester) {
@@ -119,6 +185,9 @@ class SectionController {
         return sectionRepository.findAll().stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveSection() when adding a new section
+    // LAYER 2 → LAYER 4: Assigns a sectionId, resolves program and semester references, then saves
+    // LAYER 2 → LAYER 1: Returns the saved Section JSON
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Section> create(@RequestBody Section section) {
@@ -130,6 +199,9 @@ class SectionController {
         return ResponseEntity.ok(sectionRepository.save(section));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveSection() when editing an existing section
+    // LAYER 2 → LAYER 4: Fetches the existing section, updates its fields, then saves
+    // LAYER 2 → LAYER 1: Returns the updated Section JSON, or 404 if not found
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Section> update(@PathVariable String id, @RequestBody Section section) {
@@ -146,6 +218,9 @@ class SectionController {
         return ResponseEntity.ok(sectionRepository.save(existing));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteSection() when a section is soft-deleted
+    // LAYER 2 → LAYER 4: Sets isActive = false (soft delete — data is kept, just hidden from lists)
+    // LAYER 2 → LAYER 1: Returns HTTP 204 No Content on success
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
@@ -156,12 +231,18 @@ class SectionController {
         return ResponseEntity.noContent().build();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadInstructors() and schedule modal dropdowns
+    // LAYER 2 → LAYER 4: Returns only active instructors from InstructorRepository
+    // LAYER 2 → LAYER 1: Returns a JSON list of active Instructor objects
     @GetMapping("/instructors")
     @PreAuthorize("hasRole('Registrar')")
     public List<Instructor> getInstructors() {
         return instructorRepository.findByIsActiveTrue();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveInstructor() when the registrar adds a new instructor
+    // LAYER 2 → LAYER 4: Assigns an instructorId, then calls instructorRepository.save()
+    // LAYER 2 → LAYER 1: Returns the saved Instructor JSON
     @PostMapping("/instructors")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Instructor> addInstructor(@RequestBody Instructor instructor) {
@@ -169,6 +250,9 @@ class SectionController {
         return ResponseEntity.ok(instructorRepository.save(instructor));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js when the registrar edits an existing instructor record
+    // LAYER 2 → LAYER 4: Checks existence by instructorId, then saves the updated record
+    // LAYER 2 → LAYER 1: Returns the updated Instructor JSON, or 404 if not found
     @PutMapping("/instructors/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Instructor> updateInstructor(@PathVariable String id,
@@ -178,12 +262,18 @@ class SectionController {
         return ResponseEntity.ok(instructorRepository.save(instructor));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadRooms() and schedule modal dropdowns
+    // LAYER 2 → LAYER 4: Returns only active rooms from RoomRepository
+    // LAYER 2 → LAYER 1: Returns a JSON list of active Room objects
     @GetMapping("/rooms")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Room> getRooms() {
         return roomRepository.findByIsActiveTrue();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveRoom() when a new room is added
+    // LAYER 2 → LAYER 4: Assigns a roomId, then calls roomRepository.save()
+    // LAYER 2 → LAYER 1: Returns the saved Room JSON
     @PostMapping("/rooms")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Room> addRoom(@RequestBody Room room) {
@@ -191,6 +281,9 @@ class SectionController {
         return ResponseEntity.ok(roomRepository.save(room));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js when editing an existing room record
+    // LAYER 2 → LAYER 4: Checks existence by roomId, then saves the updated record
+    // LAYER 2 → LAYER 1: Returns the updated Room JSON, or 404 if not found
     @PutMapping("/rooms/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Room> updateRoom(@PathVariable String id, @RequestBody Room room) {
@@ -209,12 +302,18 @@ class AlumniController {
     private final AlumniRepository alumniRepository;
     private final AlumniService alumniService;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadAlumni() when the alumni page is opened
+    // LAYER 2 → LAYER 3: Delegates to alumniService.getAll() which fetches from AlumniRepository
+    // LAYER 2 → LAYER 1: Returns a JSON list of all Alumni records
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public List<Alumni> getAll() {
         return alumniService.getAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js graduateStudent() when the registrar graduates a student
+    // LAYER 2 → LAYER 3: Delegates to alumniService.graduateStudent() which changes the student status and creates an Alumni record
+    // LAYER 2 → LAYER 1: Returns the new Alumni JSON, or 400 if the student is already an alumnus
     @PostMapping("/graduate/{studentId}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> graduate(@PathVariable String studentId,
@@ -230,6 +329,9 @@ class AlumniController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js when the registrar edits alumni details (ministry, address, notes)
+    // LAYER 2 → LAYER 3: Delegates to alumniService.update() after verifying the alumni ID exists
+    // LAYER 2 → LAYER 1: Returns the updated Alumni JSON, or 404 if not found
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Alumni> update(@PathVariable String id, @RequestBody Alumni alumni) {
@@ -238,6 +340,9 @@ class AlumniController {
         return ResponseEntity.ok(alumniService.update(alumni));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmUnmarkAlumni() when reversing a graduation
+    // LAYER 2 → LAYER 3: Delegates to alumniService.unmarkAlumni() which deletes the alumni record and reactivates the student
+    // LAYER 2 → LAYER 1: Returns a success message JSON, or 400 if something fails
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> unmarkAlumni(@PathVariable String id) {
@@ -260,12 +365,18 @@ class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadUsers() when the registrar opens the Users page
+    // LAYER 2 → LAYER 4: Calls userRepository.findAll() to retrieve all accounts
+    // LAYER 2 → LAYER 1: Returns a JSON list of User objects (passwordHash is @JsonIgnore so it never appears)
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public List<User> getAll() {
         return userRepository.findAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveUser() when the registrar creates a new login account
+    // LAYER 2 → LAYER 4: Validates uniqueness, hashes the password via BCrypt, then saves via userRepository
+    // LAYER 2 → LAYER 1: Returns the saved User JSON, or 400 if the username already exists or role is invalid
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> create(@RequestBody Map<String, String> body) {
@@ -289,6 +400,9 @@ class UserController {
         }
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js toggleUser() when enabling or disabling a user account
+    // LAYER 2 → LAYER 4: Finds the user by userId, flips the isActive flag, then saves
+    // LAYER 2 → LAYER 1: Returns a JSON with the new isActive value
     @PatchMapping("/{userId}/toggle")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> toggle(@PathVariable String userId) {
@@ -300,6 +414,9 @@ class UserController {
         return ResponseEntity.ok(Map.of("isActive", user.getIsActive()));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js submitResetPw() when the registrar resets a user's password
+    // LAYER 2 → LAYER 4: Generates a random password, hashes it, saves it, then returns the plain-text version once
+    // LAYER 2 → LAYER 1: Returns the temporary password in the response — shown once and never stored in plain text
     // SECURITY (A07): Registrars generate a random temp password — they cannot choose one.
     // This prevents registrars from knowing a student's actual password.
     @PatchMapping("/{userId}/generate-temp-password")
@@ -315,6 +432,8 @@ class UserController {
             "message", "Temporary password generated. Give this to the user — it will not be shown again."));
     }
 
+    // Generates a 12-character random password using letters, numbers, and symbols.
+    // Uses SecureRandom (cryptographically strong) so the output cannot be predicted.
     private String generateTemporaryPassword() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$";
         java.security.SecureRandom random = new java.security.SecureRandom();
@@ -334,24 +453,36 @@ class SchoolYearController {
     private final SchoolYearRepository schoolYearRepository;
     private final SemesterRepository semesterRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by app.js loadSchoolYears() when the registrar opens the School Years page
+    // LAYER 2 → LAYER 4: Calls schoolYearRepository.findAll() to list all school years
+    // LAYER 2 → LAYER 1: Returns a JSON list of SchoolYear objects
     @GetMapping
     @PreAuthorize("hasRole('Registrar')")
     public List<SchoolYear> getAll() {
         return schoolYearRepository.findAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js saveSchoolYear() when creating a new school year record
+    // LAYER 2 → LAYER 4: Calls schoolYearRepository.save() directly
+    // LAYER 2 → LAYER 1: Returns the saved SchoolYear JSON
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<SchoolYear> create(@RequestBody SchoolYear sy) {
         return ResponseEntity.ok(schoolYearRepository.save(sy));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js during enrollment modal and semester dropdowns
+    // LAYER 2 → LAYER 4: Calls semesterRepository.findAll() to list all semesters
+    // LAYER 2 → LAYER 1: Returns a JSON list of all Semester objects
     @GetMapping("/semesters")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public List<Semester> getSemesters() {
         return semesterRepository.findAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js init() to load the current active semester label in the header
+    // LAYER 2 → LAYER 4: Calls semesterRepository.findByIsActiveTrue() to find the one active semester
+    // LAYER 2 → LAYER 1: Returns the active Semester JSON (200), or 404 if none is active
     @GetMapping("/semesters/active")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
     public ResponseEntity<Semester> getActiveSemester() {
@@ -360,6 +491,9 @@ class SchoolYearController {
             .orElse(ResponseEntity.notFound().build());
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js activateSem() when the registrar sets a new active semester
+    // LAYER 2 → LAYER 4: Deactivates ALL semesters first, then activates the selected one
+    // LAYER 2 → LAYER 1: Returns the newly activated Semester JSON
     @PatchMapping("/semesters/{id}/activate")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Semester> activateSemester(@PathVariable String id) {
@@ -374,6 +508,9 @@ class SchoolYearController {
         return ResponseEntity.ok(semesterRepository.save(sem));
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js when the registrar adds a new semester record
+    // LAYER 2 → LAYER 4: Calls semesterRepository.save() directly
+    // LAYER 2 → LAYER 1: Returns the saved Semester JSON
     @PostMapping("/semesters")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Semester> createSemester(@RequestBody Semester semester) {
@@ -389,6 +526,9 @@ class PublicController {
 
     private final SemesterRepository semesterRepository;
 
+    // LAYER 1 → LAYER 2: Triggered by login.html JavaScript on page load to display the active semester badge
+    // LAYER 2 → LAYER 4: Uses semesterRepository.findActiveWithSchoolYear() (JOIN FETCH query — one DB call)
+    // LAYER 2 → LAYER 1: Returns a JSON object with a "label" string — no authentication required
     /** Returns the active semester label for the login page badge. No auth required. */
     @GetMapping("/active-semester")
     public ResponseEntity<Map<String, String>> getActiveSemester() {
@@ -410,12 +550,18 @@ class DocumentController {
 
     private final DocumentRepository documentRepository;
 
+    // LAYER 1 → LAYER 2: Triggered when the registrar views a student's document list
+    // LAYER 2 → LAYER 4: Calls documentRepository.findByStudent_StudentId() — no service needed
+    // LAYER 2 → LAYER 1: Returns a JSON list of Document records for the student
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Document> getByStudent(@PathVariable String studentId) {
         return documentRepository.findByStudent_StudentId(studentId);
     }
 
+    // LAYER 1 → LAYER 2: Triggered when the registrar deletes a document record
+    // LAYER 2 → LAYER 4: Calls documentRepository.deleteById() using the integer PK
+    // LAYER 2 → LAYER 1: Returns a simple success message JSON
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> delete(@PathVariable Integer id) {

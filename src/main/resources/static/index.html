@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- LAYER 1 — FRONTEND (index.html)                                         -->
+<!-- This is the main application page — the Single-Page App (SPA).         -->
+<!-- After a successful login, every user lands here.                        -->
+<!--                                                                         -->
+<!-- How it works:                                                            -->
+<!--   - The page loads once and stays loaded. JavaScript dynamically        -->
+<!--     swaps the content area to show different "modules" (dashboard,      -->
+<!--     students, grades, schedule, etc.) without full page reloads.        -->
+<!--   - app.js reads the current URL to decide which module to show.        -->
+<!--   - api.js provides helper functions to call the Spring Boot API        -->
+<!--     (Layer 2 controllers) and handle responses.                         -->
+<!--                                                                         -->
+<!-- LAYER 1 → LAYER 2: JavaScript in app.js and api.js sends HTTP requests  -->
+<!--   (GET, POST, PUT, PATCH, DELETE) to REST API endpoints like            -->
+<!--   /api/students, /api/grades, /api/enrollment, /api/schedule, etc.      -->
+<!-- LAYER 2 → LAYER 1: The API returns JSON, which JavaScript uses to       -->
+<!--   build and update the tables, forms, and cards shown on screen.        -->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>

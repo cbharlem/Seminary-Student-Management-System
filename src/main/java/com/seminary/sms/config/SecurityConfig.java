@@ -1,5 +1,44 @@
 package com.seminary.sms.config;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG / SUPPORT — SecurityConfig
+// This is not part of any numbered layer. It is the central security
+// configuration for the entire application, built on Spring Security.
+//
+// What it does:
+//
+//   1. HTTP Security Headers
+//      Sets browser-level protections: blocks the page from being embedded in
+//      iframes (clickjacking), enforces HTTPS (HSTS), and enables XSS filters.
+//
+//   2. Access Rules
+//      Defines which URLs require login and which are public:
+//        - /login.html, /css/**, /js/**, /images/**, /api/public/** → open to everyone
+//        - Everything else → must be logged in
+//
+//   3. Form Login
+//      Configures the login form at /login.html, processes credentials at POST /login.
+//      On success → clears the brute-force counter and redirects to /index.html.
+//      On failure → records the failed attempt; if locked, redirects with ?blocked=true.
+//
+//   4. Rate Limiting Filter
+//      A custom filter that runs before Spring's own login filter.
+//      If a username is blocked (too many failures), the request is rejected
+//      immediately without even checking the password.
+//
+//   5. Logout
+//      Handles GET /logout → invalidates the session, deletes the JSESSIONID cookie,
+//      and redirects to /login.html?logout=true.
+//
+//   6. UserDetailsService (bean)
+//      Tells Spring Security how to load a user from the database at login time.
+//      Looks up the username in UserRepository and checks if the account is active.
+//
+//   7. PasswordEncoder (bean)
+//      Uses BCrypt — a strong hashing algorithm — to hash and verify passwords.
+//      Passwords are NEVER stored as plain text.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import com.seminary.sms.entity.User;
 import com.seminary.sms.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

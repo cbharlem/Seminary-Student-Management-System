@@ -1,5 +1,28 @@
 package com.seminary.sms.config;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG / SUPPORT — GlobalExceptionHandler
+// This is not part of any numbered layer. It is a cross-cutting support class
+// that applies to the entire application.
+//
+// What it does:
+//   Spring normally shows a default error page or exposes an exception message
+//   when something goes wrong. That is dangerous — error messages can leak
+//   internal class names, database details, or stack traces to attackers.
+//
+//   This class uses @RestControllerAdvice, which means Spring will automatically
+//   call it whenever an unhandled exception escapes from any controller.
+//   It acts as a safety net for the whole application.
+//
+// Exceptions handled:
+//   AccessDeniedException    → returns HTTP 403 with a generic "Access denied." message
+//   IllegalArgumentException → returns HTTP 400 with a generic message.
+//                              Important: we do NOT expose e.getMessage() here because
+//                              Java's Enum.valueOf() error messages include full class paths.
+//   Exception (catch-all)    → returns HTTP 500 with a generic message.
+//                              Prevents stack traces from ever reaching the browser.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
