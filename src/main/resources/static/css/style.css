@@ -544,6 +544,42 @@ thead th.sortable.sort-desc::after {
 .grade-fail { color: var(--danger);  font-weight: 600; }
 .grade-inc  { color: var(--warn);    font-weight: 600; }
 
+/* ── Grade Student Search ──────────────────────────────────── */
+.grade-search-wrap              { position: relative; }
+.grade-suggestions              { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.1); z-index: 200; max-height: 240px; overflow-y: auto; }
+.grade-suggestions.open         { display: block; }
+.grade-sug-item                 { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; cursor: pointer; font-size: .875rem; gap: 8px; outline: none; }
+.grade-sug-item:hover,
+.grade-sug-item:focus           { background: var(--gray-50); }
+.grade-sug-item:first-child     { border-radius: 8px 8px 0 0; }
+.grade-sug-item:last-child      { border-radius: 0 0 8px 8px; }
+.grade-sug-name                 { font-weight: 500; color: var(--gray-800); }
+.grade-sug-id                   { font-size: .75rem; color: var(--gray-600); white-space: nowrap; } /* gray-600 = 7.6:1 contrast ✅ */
+.grade-sug-empty                { padding: 10px 14px; font-size: .875rem; color: var(--gray-600); }
+/* Unconfirmed state — ISO 9241-110: self-descriptive; user typed but hasn't selected yet */
+.search-input.unconfirmed       { border-color: var(--accent-lt); }
+
+/* ── Grade Entry Modal ─────────────────────────────────────── */
+.modal-wide                 { max-width: 640px; }
+.grade-term-sections        { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 0; }
+.grade-term-block           { background: var(--gray-50); border: 1px solid var(--gray-100); border-radius: 8px; padding: 14px; }
+.grade-term-label           { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gray-600); margin-bottom: 10px; }
+.grade-term-result          { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--gray-200); font-size: .83rem; color: var(--gray-600); }
+.grade-term-val             { font-weight: 700; font-size: 1rem; color: var(--gray-800); }
+.grade-final-bar            { display: flex; justify-content: space-between; align-items: center; background: var(--gray-100); border-radius: 8px; padding: 12px 16px; margin-top: 14px; }
+.grade-final-label          { font-size: .83rem; font-weight: 600; color: var(--gray-600); }
+.grade-final-val            { font-size: 1.25rem; font-weight: 700; color: var(--gray-800); }
+
+/* ── Grade Group Table ─────────────────────────────────────── */
+.grade-group-header td    { background: var(--gray-50); border-top: 2px solid var(--gray-100); padding: 10px 16px; }
+.grade-group-meta         { display: flex; align-items: center; gap: 12px; }
+.grade-group-name         { font-weight: 600; font-size: .9rem; }
+.grade-group-id           { font-size: .75rem; color: var(--gray-600); } /* gray-600 = 7.6:1 contrast ✅ */
+.grade-gwa-chip           { font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--gray-100); }
+.grade-detail-row td      { padding-left: 24px; }
+.grade-course-code        { font-weight: 600; font-size: .85rem; margin-right: 6px; }
+.grade-course-name        { font-size: .78rem; color: var(--gray-600); } /* gray-600 = 7.6:1 contrast ✅ */
+
 /* ── Progress Bar ──────────────────────────────────────────── */
 .progress-wrap { background: var(--gray-100); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 6px; }
 .progress-bar  { height: 100%; border-radius: 4px; background: var(--navy); }

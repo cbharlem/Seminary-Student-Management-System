@@ -117,12 +117,16 @@ public class GradeService {
     // LAYER 3 → LAYER 4: Fetches the grade by its integer PK, updates all fields, then calls saveGrade()
     //   to recompute the final rating and sync the enrollment subject status
     @Transactional
-    public Grade updateGrade(Integer gradeId, BigDecimal midterm, BigDecimal finalGrade,
+    public Grade updateGrade(String gradeId,
+                              BigDecimal midtermClassStanding, BigDecimal midtermExam,
+                              BigDecimal finalClassStanding,   BigDecimal finalExam,
                               Grade.GradeStatus status, String remarks, User enteredBy) {
-        Grade grade = gradeRepository.findById(gradeId)
+        Grade grade = gradeRepository.findByGradeId(gradeId)
             .orElseThrow(() -> new RuntimeException("Grade not found: " + gradeId));
-        grade.setMidtermGrade(midterm);
-        grade.setFinalGrade(finalGrade);
+        grade.setMidtermClassStanding(midtermClassStanding);
+        grade.setMidtermExam(midtermExam);
+        grade.setFinalClassStanding(finalClassStanding);
+        grade.setFinalExam(finalExam);
         grade.setGradeStatus(status);
         grade.setRemarks(remarks);
         return saveGrade(grade, enteredBy);

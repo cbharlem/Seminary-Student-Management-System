@@ -64,9 +64,20 @@ public class Grade {
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private Semester semester;
 
-    @Column(name = "fldMidtermGrade", precision = 3, scale = 2) private BigDecimal midtermGrade;
-    @Column(name = "fldFinalGrade",   precision = 3, scale = 2) private BigDecimal finalGrade;
-    @Column(name = "fldFinalRating",  precision = 3, scale = 2) private BigDecimal finalRating;
+    // Midterm components — entered by registrar
+    @Column(name = "fldMidtermClassStanding", precision = 5, scale = 2) private BigDecimal midtermClassStanding;
+    @Column(name = "fldMidtermExam",          precision = 5, scale = 2) private BigDecimal midtermExam;
+    // Midterm term grade — computed: (CS × 60%) + (Exam × 40%)
+    @Column(name = "fldMidtermGrade", precision = 5, scale = 2) private BigDecimal midtermGrade;
+
+    // Final components — entered by registrar
+    @Column(name = "fldFinalClassStanding", precision = 5, scale = 2) private BigDecimal finalClassStanding;
+    @Column(name = "fldFinalExam",          precision = 5, scale = 2) private BigDecimal finalExam;
+    // Final term grade — computed: (CS × 60%) + (Exam × 40%)
+    @Column(name = "fldFinalGrade",  precision = 5, scale = 2) private BigDecimal finalGrade;
+
+    // Course final rating — computed: (Midterm Grade + Final Grade) / 2
+    @Column(name = "fldFinalRating", precision = 5, scale = 2) private BigDecimal finalRating;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "fldGradeStatus", nullable = false)
@@ -93,10 +104,30 @@ public class Grade {
     @PreUpdate
     protected void onUpdate() { lastModifiedAt = LocalDateTime.now(); }
 
-    // Calculates the final rating as the average of midterm and final grades
-    // Also sets gradeStatus to Passed if the rating is 3.0 or below, otherwise Failed
-    // Called by: GradeService.save() after receiving midterm and final grade values
+    /**
+     * Option A — CHED grading formula:
+     *   Term Grade  = (Class Standing × 0.60) + (Exam × 0.40)
+     *   Final Rating = (Midterm Grade + Final Grade) / 2
+     * Skips computation if status is manually set to Incomplete or Dropped.
+     */
     public void computeFinalRating() {
+        if (gradeStatus == GradeStatus.Incomplete || gradeStatus == GradeStatus.Dropped) return;
+
+        // Compute midterm term grade from components
+        if (midtermClassStanding != null && midtermExam != null) {
+            midtermGrade = midtermClassStanding.multiply(new BigDecimal("0.60"))
+                .add(midtermExam.multiply(new BigDecimal("0.40")))
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        // Compute final term grade from components
+        if (finalClassStanding != null && finalExam != null) {
+            finalGrade = finalClassStanding.multiply(new BigDecimal("0.60"))
+                .add(finalExam.multiply(new BigDecimal("0.40")))
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        // Compute course final rating from both term grades
         if (midtermGrade != null && finalGrade != null) {
             finalRating = midtermGrade.add(finalGrade)
                 .divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP);

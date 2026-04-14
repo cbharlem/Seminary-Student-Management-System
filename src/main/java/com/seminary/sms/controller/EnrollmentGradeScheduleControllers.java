@@ -187,29 +187,28 @@ class GradeController {
     // LAYER 2 → LAYER 1: Returns the updated Grade JSON, or 400 if grades are out of range or status is invalid
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<?> update(@PathVariable Integer id,
+    public ResponseEntity<?> update(@PathVariable String id,
                                      @RequestBody Map<String, Object> body,
                                      Authentication auth) {
         try {
             User user = userRepository.findByUsername(auth.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-            BigDecimal midterm = body.get("midtermGrade") != null
-                ? new BigDecimal(body.get("midtermGrade").toString()) : null;
-            BigDecimal finalG = body.get("finalGrade") != null
-                ? new BigDecimal(body.get("finalGrade").toString()) : null;
+            BigDecimal mtCS   = body.get("midtermClassStanding") != null ? new BigDecimal(body.get("midtermClassStanding").toString()) : null;
+            BigDecimal mtExam = body.get("midtermExam")          != null ? new BigDecimal(body.get("midtermExam").toString())          : null;
+            BigDecimal fnCS   = body.get("finalClassStanding")   != null ? new BigDecimal(body.get("finalClassStanding").toString())   : null;
+            BigDecimal fnExam = body.get("finalExam")            != null ? new BigDecimal(body.get("finalExam").toString())            : null;
             // SECURITY (A04): Validate grade range — Philippine grading: 1.0 (highest) to 5.0 (failed)
-            BigDecimal MIN_GRADE = new BigDecimal("1.0");
-            BigDecimal MAX_GRADE = new BigDecimal("5.0");
-            if (midterm != null && (midterm.compareTo(MIN_GRADE) < 0 || midterm.compareTo(MAX_GRADE) > 0))
-                return ResponseEntity.badRequest().body(Map.of("error", "Midterm grade must be between 1.0 and 5.0"));
-            if (finalG != null && (finalG.compareTo(MIN_GRADE) < 0 || finalG.compareTo(MAX_GRADE) > 0))
-                return ResponseEntity.badRequest().body(Map.of("error", "Final grade must be between 1.0 and 5.0"));
+            BigDecimal MIN = new BigDecimal("1.0"), MAX = new BigDecimal("5.0");
+            if (mtCS   != null && (mtCS.compareTo(MIN)   < 0 || mtCS.compareTo(MAX)   > 0)) return ResponseEntity.badRequest().body(Map.of("error", "Midterm class standing must be between 1.0 and 5.0"));
+            if (mtExam != null && (mtExam.compareTo(MIN) < 0 || mtExam.compareTo(MAX) > 0)) return ResponseEntity.badRequest().body(Map.of("error", "Midterm exam grade must be between 1.0 and 5.0"));
+            if (fnCS   != null && (fnCS.compareTo(MIN)   < 0 || fnCS.compareTo(MAX)   > 0)) return ResponseEntity.badRequest().body(Map.of("error", "Final class standing must be between 1.0 and 5.0"));
+            if (fnExam != null && (fnExam.compareTo(MIN) < 0 || fnExam.compareTo(MAX) > 0)) return ResponseEntity.badRequest().body(Map.of("error", "Final exam grade must be between 1.0 and 5.0"));
             // SECURITY (A07): Null check before toString — and enum poisoning catch below
             if (body.get("gradeStatus") == null)
                 return ResponseEntity.badRequest().body(Map.of("error", "Grade status is required."));
             Grade.GradeStatus status = Grade.GradeStatus.valueOf(body.get("gradeStatus").toString());
             String remarks = body.get("remarks") != null ? body.get("remarks").toString() : null;
-            return ResponseEntity.ok(gradeService.updateGrade(id, midterm, finalG, status, remarks, user));
+            return ResponseEntity.ok(gradeService.updateGrade(id, mtCS, mtExam, fnCS, fnExam, status, remarks, user));
         } catch (IllegalArgumentException e) {
             // SECURITY (A08): Enum poisoning — return generic message not class path
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid grade status value."));

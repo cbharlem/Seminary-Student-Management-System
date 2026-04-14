@@ -476,16 +476,82 @@ function loadScheduleGrid() {
   }).catch(console.error);
 }
 
+// Student list for grade search — loaded once, reused on every keystroke
+let _gradeStudents = [];
+let _selectedGradeStudentId = null;
+
 async function loadGrades() {
   try {
-    const sem = SMS.activeSemester ? `?semester=${SMS.activeSemester.semesterId}` : '';
-    const data = await api(`/api/grades${sem}`);
+    // Populate semester dropdown on first load
+    const semEl = document.getElementById('grade-filter-sem');
+    if (semEl && semEl.options.length <= 1) {
+      try {
+        const semesters = await api('/api/school-years/semesters');
+        semesters.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.semesterId;
+          opt.textContent = s.semesterLabel;
+          semEl.appendChild(opt);
+        });
+      } catch (_) {}
+      if (SMS.activeSemester) semEl.value = SMS.activeSemester.semesterId;
+    }
+
+    // Load student list once for the search box
+    if (_gradeStudents.length === 0) {
+      try { _gradeStudents = await api('/api/students'); } catch (_) {}
+    }
+
     const tbody = document.getElementById('tbl-grades');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No grades recorded yet.</p></div></td></tr>'; return; }
-    tbody.innerHTML = data.map(g =>
-      `<tr>
-        <td>${escHtml(g.student?.firstName)} ${escHtml(g.student?.lastName)}</td>
-        <td>${escHtml(g.course?.courseCode)}</td>
+    if (!_selectedGradeStudentId) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Search and select a student above to view their grades.</p></div></td></tr>';
+      return;
+    }
+
+    // Loading state — Nielsen H1: visibility of system status
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--gray-400)">Loading grades…</td></tr>';
+
+    // Active Semester option (empty value) falls back to the actual active semester ID
+    const selectedSem = semEl?.value || SMS.activeSemester?.semesterId || '';
+    const semParam = selectedSem ? `?semester=${selectedSem}` : '';
+    const data = await api(`/api/grades/student/${_selectedGradeStudentId}${semParam}`);
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No grades recorded for this student yet.</p></div></td></tr>';
+      return;
+    }
+
+    const student = data[0].student;
+    const name = escHtml(`${student?.firstName || ''} ${student?.lastName || ''}`.trim());
+    const sid  = escHtml(student?.studentId || '—');
+
+    let totalWeighted = 0, totalUnits = 0;
+    data.forEach(g => {
+      if (g.finalRating != null && g.course?.units) {
+        totalWeighted += parseFloat(g.finalRating) * g.course.units;
+        totalUnits += g.course.units;
+      }
+    });
+    const gwa = totalUnits > 0 ? (totalWeighted / totalUnits).toFixed(2) : null;
+    const gwaHtml = gwa
+      ? `<span class="grade-gwa-chip ${parseFloat(gwa) <= 3.0 ? 'grade-pass' : 'grade-fail'}">GWA ${gwa}</span>`
+      : `<span class="grade-gwa-chip" style="color:var(--gray-400)">No ratings yet</span>`;
+
+    let html = `<tr class="grade-group-header">
+      <td colspan="6"><div class="grade-group-meta">
+        <span class="grade-group-name">${name}</span>
+        <span class="grade-group-id">${sid}</span>
+        ${gwaHtml}
+      </div></td><td></td>
+    </tr>`;
+
+    data.forEach(g => {
+      html += `<tr class="grade-detail-row">
+        <td>
+          <span class="grade-course-code">${escHtml(g.course?.courseCode || '—')}</span>
+          <span class="grade-course-name">${escHtml(g.course?.courseName || '')}</span>
+        </td>
+        <td style="text-align:center">${g.course?.units ?? '—'}</td>
         <td class="${gradeClass(g.midtermGrade)}">${g.midtermGrade || '—'}</td>
         <td class="${gradeClass(g.finalGrade)}">${g.finalGrade || '—'}</td>
         <td class="${gradeClass(g.finalRating)}">${g.finalRating || '—'}</td>
@@ -494,15 +560,113 @@ async function loadGrades() {
           data-grade-id="${g.gradeId}"
           data-student="${escHtml((g.student?.firstName || '') + ' ' + (g.student?.lastName || ''))}"
           data-course="${escHtml(g.course?.courseCode || '')}"
-          data-midterm="${g.midtermGrade || ''}"
-          data-final="${g.finalGrade || ''}"
+          data-mt-cs="${g.midtermClassStanding || ''}"
+          data-mt-exam="${g.midtermExam || ''}"
+          data-fn-cs="${g.finalClassStanding || ''}"
+          data-fn-exam="${g.finalExam || ''}"
+          data-mt-grade="${g.midtermGrade || ''}"
+          data-fn-grade="${g.finalGrade || ''}"
           data-status="${escHtml(g.gradeStatus || '')}"
           data-remarks="${escHtml(g.remarks || '')}"
           onclick="editGradeFromRow(this)">Edit</button></td>
-      </tr>`
-    ).join('');
+      </tr>`;
+    });
+
+    tbody.innerHTML = html;
   } catch (e) { console.error(e); }
 }
+
+function filterGradeStudents(query) {
+  const sugEl = document.getElementById('grade-suggestions');
+  const q = query.trim().toLowerCase();
+
+  // Clear selection whenever the user edits the input — mark as unconfirmed
+  _selectedGradeStudentId = null;
+  document.getElementById('grade-student-search')?.classList.add('unconfirmed');
+
+  if (!q) {
+    sugEl.innerHTML = '';
+    sugEl.classList.remove('open');
+    document.getElementById('grade-student-search')?.classList.remove('unconfirmed');
+    document.getElementById('tbl-grades').innerHTML =
+      '<tr><td colspan="7"><div class="empty-state"><p>Search and select a student above to view their grades.</p></div></td></tr>';
+    return;
+  }
+
+  const matches = _gradeStudents
+    .filter(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) || s.studentId.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!matches.length) {
+    sugEl.innerHTML = '<div class="grade-sug-empty">No students found</div>';
+    sugEl.classList.add('open');
+    return;
+  }
+
+  // tabindex + onkeydown on each item for keyboard navigation (WCAG 2.1, ISO 9241-171)
+  sugEl.innerHTML = matches.map(s =>
+    `<div class="grade-sug-item" tabindex="0"
+      onmousedown="selectGradeStudent('${escHtml(s.studentId)}','${escHtml(s.firstName + ' ' + s.lastName)}')"
+      onkeydown="onGradeSugKeydown(event,this,'${escHtml(s.studentId)}','${escHtml(s.firstName + ' ' + s.lastName)}')">
+      <span class="grade-sug-name">${escHtml(s.firstName)} ${escHtml(s.lastName)}</span>
+      <span class="grade-sug-id">${escHtml(s.studentId)}</span>
+    </div>`
+  ).join('');
+  sugEl.classList.add('open');
+}
+
+function selectGradeStudent(studentId, fullName) {
+  _selectedGradeStudentId = studentId;
+  const input = document.getElementById('grade-student-search');
+  input.value = fullName;
+  input.classList.remove('unconfirmed');
+  const sugEl = document.getElementById('grade-suggestions');
+  sugEl.classList.remove('open');
+  sugEl.innerHTML = '';
+  loadGrades();
+}
+
+// ArrowDown from input → focus first suggestion; Escape → close
+function onGradeSearchKeydown(e) {
+  const sugEl = document.getElementById('grade-suggestions');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const first = sugEl.querySelector('.grade-sug-item');
+    if (first) first.focus();
+  } else if (e.key === 'Escape') {
+    sugEl.classList.remove('open');
+    sugEl.innerHTML = '';
+  }
+}
+
+// Arrow keys + Enter + Escape on suggestion items
+function onGradeSugKeydown(e, el, studentId, fullName) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    selectGradeStudent(studentId, fullName);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const next = el.nextElementSibling;
+    if (next?.classList.contains('grade-sug-item')) next.focus();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const prev = el.previousElementSibling;
+    if (prev?.classList.contains('grade-sug-item')) prev.focus();
+    else document.getElementById('grade-student-search').focus();
+  } else if (e.key === 'Escape') {
+    document.getElementById('grade-suggestions').classList.remove('open');
+    document.getElementById('grade-suggestions').innerHTML = '';
+    document.getElementById('grade-student-search').focus();
+  }
+}
+
+// Close suggestions when clicking anywhere outside the search box
+document.addEventListener('click', e => {
+  if (!e.target.closest('.grade-search-wrap')) {
+    const sugEl = document.getElementById('grade-suggestions');
+    if (sugEl) { sugEl.classList.remove('open'); sugEl.innerHTML = ''; }
+  }
+});
 
 async function loadInstructors() {
   try {
@@ -980,14 +1144,19 @@ async function saveEnrollment() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-function editGrade(id, student, course, midterm, finalG, status, remarks) {
-  document.getElementById('grade-id').value   = id;
-  document.getElementById('gr-student').value = student;
-  document.getElementById('gr-course').value  = course;
-  document.getElementById('gr-midterm').value = midterm === 'null' ? '' : midterm;
-  document.getElementById('gr-final').value   = finalG === 'null' ? '' : finalG;
-  document.getElementById('gr-status').value  = status;
-  document.getElementById('gr-remarks').value = remarks;
+function editGrade(id, student, course, mtCS, mtExam, fnCS, fnExam, mtGrade, fnGrade, status, remarks) {
+  document.getElementById('grade-id').value    = id;
+  document.getElementById('gr-student').value  = student;
+  document.getElementById('gr-course').value   = course;
+  document.getElementById('gr-mt-cs').value    = mtCS   || '';
+  document.getElementById('gr-mt-exam').value  = mtExam || '';
+  document.getElementById('gr-fn-cs').value    = fnCS   || '';
+  document.getElementById('gr-fn-exam').value  = fnExam || '';
+  document.getElementById('gr-mt-grade').textContent = mtGrade || '—';
+  document.getElementById('gr-fn-grade').textContent = fnGrade || '—';
+  document.getElementById('gr-status').value   = status;
+  document.getElementById('gr-remarks').value  = remarks;
+  recomputeGradeModal();
   openModal('modal-grade');
 }
 
@@ -998,8 +1167,12 @@ function editGradeFromRow(btn) {
     btn.dataset.gradeId,
     btn.dataset.student,
     btn.dataset.course,
-    btn.dataset.midterm || 'null',
-    btn.dataset.final   || 'null',
+    btn.dataset.mtCs    || '',
+    btn.dataset.mtExam  || '',
+    btn.dataset.fnCs    || '',
+    btn.dataset.fnExam  || '',
+    btn.dataset.mtGrade || '',
+    btn.dataset.fnGrade || '',
     btn.dataset.status,
     btn.dataset.remarks
   );
@@ -1009,13 +1182,42 @@ async function saveGrade() {
   const id = document.getElementById('grade-id').value;
   try {
     await api(`/api/grades/${id}`, 'PUT', {
-      midtermGrade: document.getElementById('gr-midterm').value || null,
-      finalGrade:   document.getElementById('gr-final').value   || null,
-      gradeStatus:  document.getElementById('gr-status').value,
-      remarks:      document.getElementById('gr-remarks').value,
+      midtermClassStanding: document.getElementById('gr-mt-cs').value   || null,
+      midtermExam:          document.getElementById('gr-mt-exam').value || null,
+      finalClassStanding:   document.getElementById('gr-fn-cs').value   || null,
+      finalExam:            document.getElementById('gr-fn-exam').value || null,
+      gradeStatus:          document.getElementById('gr-status').value,
+      remarks:              document.getElementById('gr-remarks').value,
     });
     toast('Grade saved'); closeModal('modal-grade'); loadGrades();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+// Live computation — mirrors the Java formula so the registrar sees the result before saving
+function recomputeGradeModal() {
+  const mtCS   = parseFloat(document.getElementById('gr-mt-cs').value);
+  const mtExam = parseFloat(document.getElementById('gr-mt-exam').value);
+  const fnCS   = parseFloat(document.getElementById('gr-fn-cs').value);
+  const fnExam = parseFloat(document.getElementById('gr-fn-exam').value);
+
+  const mtGrade = (!isNaN(mtCS) && !isNaN(mtExam)) ? (mtCS * 0.60 + mtExam * 0.40) : null;
+  const fnGrade = (!isNaN(fnCS) && !isNaN(fnExam)) ? (fnCS * 0.60 + fnExam * 0.40) : null;
+  const rating  = (mtGrade !== null && fnGrade !== null) ? ((mtGrade + fnGrade) / 2) : null;
+
+  const fmt = v => v !== null ? v.toFixed(2) : '—';
+  document.getElementById('gr-mt-grade').textContent  = fmt(mtGrade);
+  document.getElementById('gr-fn-grade').textContent  = fmt(fnGrade);
+
+  const ratingEl = document.getElementById('gr-final-rating');
+  ratingEl.textContent = fmt(rating);
+  ratingEl.className = 'grade-final-val' + (rating !== null ? (rating <= 3.0 ? ' grade-pass' : ' grade-fail') : '');
+
+  // Auto-set status when both term grades are complete
+  if (rating !== null) {
+    const statusEl = document.getElementById('gr-status');
+    if (statusEl.value !== 'Incomplete' && statusEl.value !== 'Dropped')
+      statusEl.value = rating <= 3.0 ? 'Passed' : 'Failed';
+  }
 }
 
 function openCourseModal(courseIdOrNull) {

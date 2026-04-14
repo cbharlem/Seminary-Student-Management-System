@@ -102,6 +102,10 @@ public class EnrollmentService {
 
         // Assign section
         if (section != null) {
+            long enrolled = studentSectionRepository.findBySection_Index(section.getIndex()).size();
+            if (enrolled >= section.getCapacity()) {
+                throw new RuntimeException("Section " + section.getSectionCode() + " is already full (" + section.getCapacity() + "/" + section.getCapacity() + " students).");
+            }
             StudentSection ss = StudentSection.builder()
                 .studentSectionId("SS-" + String.format("%03d", 1 + studentSectionRepository.count()))
                 .student(student)
@@ -153,7 +157,20 @@ public class EnrollmentService {
             .schedule(schedule)
             .status(EnrollmentSubject.SubjectStatus.Enrolled)
             .build();
-        return enrollmentSubjectRepository.save(es);
+        es = enrollmentSubjectRepository.save(es);
+
+        // Auto-create a grade placeholder so the registrar can enter grades immediately
+        Grade grade = Grade.builder()
+            .gradeId("GRD-" + System.currentTimeMillis())
+            .enrollmentSubject(es)
+            .student(enrollment.getStudent())
+            .course(course)
+            .semester(enrollment.getSemester())
+            .gradeStatus(Grade.GradeStatus.NotYetGraded)
+            .build();
+        gradeRepository.save(grade);
+
+        return es;
     }
 
     // LAYER 2 → LAYER 3: Called by EnrollmentController.getSubjects() to list the subjects in an enrollment
