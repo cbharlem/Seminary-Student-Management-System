@@ -251,15 +251,21 @@ class SectionController {
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js when the registrar edits an existing instructor record
-    // LAYER 2 → LAYER 4: Checks existence by instructorId, then saves the updated record
+    // LAYER 2 → LAYER 4: Fetches existing record, patches editable fields, saves the updated record
     // LAYER 2 → LAYER 1: Returns the updated Instructor JSON, or 404 if not found
     @PutMapping("/instructors/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Instructor> updateInstructor(@PathVariable String id,
-                                                        @RequestBody Instructor instructor) {
-        if (!instructorRepository.existsByInstructorId(id)) return ResponseEntity.notFound().build();
-        instructor.setInstructorId(id);
-        return ResponseEntity.ok(instructorRepository.save(instructor));
+                                                        @RequestBody Instructor incoming) {
+        return instructorRepository.findByInstructorId(id).map(existing -> {
+            existing.setFirstName(incoming.getFirstName());
+            existing.setMiddleName(incoming.getMiddleName());
+            existing.setLastName(incoming.getLastName());
+            existing.setEmail(incoming.getEmail());
+            existing.setContactNumber(incoming.getContactNumber());
+            existing.setSpecialization(incoming.getSpecialization());
+            return ResponseEntity.ok(instructorRepository.save(existing));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadRooms() and schedule modal dropdowns

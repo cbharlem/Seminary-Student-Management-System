@@ -45,6 +45,7 @@ function validateRequired(fields) {
 }
 
 // ── State ─────────────────────────────────────────────────────
+let _instructorCache = {};
 let _enrStudents = [];
 let _currentStudentId = null;
 let _scheduleCache = {};
@@ -56,6 +57,7 @@ const _courseMap = {};
 // ── Page Navigation ───────────────────────────────────────────
 const pageLoaders = {
   dashboard:      loadDashboard,
+  submissions:    loadSubmissions,
   applicants:     loadApplicants,
   enrollment:     loadEnrollment,
   students:       loadStudents,
@@ -673,10 +675,12 @@ async function loadInstructors() {
     const data = await api('/api/sections/instructors');
     const tbody = document.getElementById('tbl-instructors');
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No instructors found.</p></div></td></tr>'; return; }
+    _instructorCache = {};
+    data.forEach(i => { _instructorCache[i.instructorId] = i; });
     tbody.innerHTML = data.map(i =>
       `<tr><td>${escHtml(i.instructorId)}</td><td>${escHtml(i.firstName)} ${escHtml(i.lastName)}</td><td>${escHtml(i.email || '—')}</td><td>${escHtml(i.specialization || '—')}</td>
       <td>${badge(i.isActive ? 'Active' : 'Inactive', i.isActive ? 'success' : 'gray')}</td>
-      <td><button class="btn btn-outline btn-sm">Edit</button></td></tr>`
+      <td><button class="btn btn-outline btn-sm" onclick="editInstructor('${escHtml(i.instructorId)}')">Edit</button></td></tr>`
     ).join('');
   } catch (e) { console.error(e); }
 }
@@ -1438,21 +1442,52 @@ async function doDeleteSchedule() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+function clearInstructorForm() {
+  ['ins-id','ins-fname','ins-lname','ins-mname','ins-email','ins-contact','ins-spec'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('ins-modal').classList.remove('editing');
+  document.getElementById('ins-modal-title').textContent = 'Add Instructor';
+}
+
+function editInstructor(instructorId) {
+  const i = _instructorCache[instructorId];
+  if (!i) return;
+  document.getElementById('ins-id').value      = i.instructorId;
+  document.getElementById('ins-fname').value   = i.firstName   || '';
+  document.getElementById('ins-lname').value   = i.lastName    || '';
+  document.getElementById('ins-mname').value   = i.middleName  || '';
+  document.getElementById('ins-email').value   = i.email       || '';
+  document.getElementById('ins-contact').value = i.contactNumber || '';
+  document.getElementById('ins-spec').value    = i.specialization || '';
+  document.getElementById('ins-modal').classList.add('editing');
+  document.getElementById('ins-modal-title').textContent = 'Edit Instructor';
+  openModal('modal-instructor');
+}
+
 async function saveInstructor() {
   if (!validateRequired([
     {id:'ins-fname', label:'First Name'},
     {id:'ins-lname', label:'Last Name'},
   ])) return;
+  const existingId = document.getElementById('ins-id').value;
+  const payload = {
+    firstName:       document.getElementById('ins-fname').value,
+    lastName:        document.getElementById('ins-lname').value,
+    middleName:      document.getElementById('ins-mname').value,
+    email:           document.getElementById('ins-email').value,
+    contactNumber:   document.getElementById('ins-contact').value,
+    specialization:  document.getElementById('ins-spec').value,
+  };
   try {
-    await api('/api/sections/instructors', 'POST', {
-      firstName:       document.getElementById('ins-fname').value,
-      lastName:        document.getElementById('ins-lname').value,
-      middleName:      document.getElementById('ins-mname').value,
-      email:           document.getElementById('ins-email').value,
-      contactNumber:   document.getElementById('ins-contact').value,
-      specialization:  document.getElementById('ins-spec').value,
-    });
-    toast('Instructor saved'); closeModal('modal-instructor'); loadInstructors();
+    if (existingId) {
+      await api(`/api/sections/instructors/${existingId}`, 'PUT', payload);
+      toast('Instructor updated');
+    } else {
+      await api('/api/sections/instructors', 'POST', payload);
+      toast('Instructor saved');
+    }
+    closeModal('modal-instructor'); loadInstructors();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1815,6 +1850,201 @@ async function addEnrollmentSubject() {
     document.getElementById('enrs-add-form').style.display = 'none';
     await refreshSubjectsTable();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SUBMISSIONS MODULE
+// Handles the Online Submissions screen for the registrar.
+// Students submit via /apply.html → stored as OnlineSubmission (Pending).
+// Registrar reviews here, then accepts (→ creates Applicant) or rejects.
+// ══════════════════════════════════════════════════════════════
+
+let _currentSubmissionId = null;   // submissionId of the modal currently open
+let _submissionStatusFilter = '';  // current active tab filter
+
+/** Loads all submissions for the given status filter and renders the table. */
+async function loadSubmissions(statusFilter) {
+  if (statusFilter !== undefined) _submissionStatusFilter = statusFilter;
+  const url = _submissionStatusFilter
+    ? `/api/submissions?status=${encodeURIComponent(_submissionStatusFilter)}`
+    : '/api/submissions';
+  try {
+    const data = await api(url);
+    renderSubmissionsTable(data);
+    updateSubCounts(data, _submissionStatusFilter);
+  } catch (e) {
+    document.getElementById('tbl-submissions').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;color:var(--danger);padding:20px">${e.message}</td></tr>`;
+  }
+}
+
+/** Switches the active tab and reloads the table. */
+function switchSubTab(btn, status) {
+  document.querySelectorAll('#sub-tabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  loadSubmissions(status);
+}
+
+/** Renders submission rows into the table. */
+function renderSubmissionsTable(rows) {
+  const tbody = document.getElementById('tbl-submissions');
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:24px">No submissions found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(s => {
+    const name   = [s.lastName, s.firstName, s.middleName].filter(Boolean).join(', ');
+    const prog   = s.appliedProgram?.programName || '—';
+    const date   = s.submittedAt ? s.submittedAt.substring(0,10) : '—';
+    const badge  = subStatusBadge(s.status);
+    const canAct = s.status === 'Pending';
+    return `<tr>
+      <td>${s.submissionId}</td>
+      <td>${escHtml(name)}</td>
+      <td>${s.seminaryLevel || '—'}</td>
+      <td>${escHtml(prog)}</td>
+      <td>${date}</td>
+      <td>${badge}</td>
+      <td><button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px"
+           onclick="openSubmissionDetail('${s.submissionId}')">Review</button></td>
+    </tr>`;
+  }).join('');
+}
+
+/** Updates the count badges on each tab after a full load. */
+function updateSubCounts(allLoaded, currentFilter) {
+  // Only update all counts when not filtered (too expensive to do 4 calls)
+  // For a filtered view just update the current tab
+  if (!currentFilter) {
+    let pending=0, accepted=0, rejected=0;
+    allLoaded.forEach(s => {
+      if (s.status==='Pending')  pending++;
+      if (s.status==='Accepted') accepted++;
+      if (s.status==='Rejected') rejected++;
+    });
+    const total = allLoaded.length;
+    document.getElementById('sub-count-all').textContent      = total;
+    document.getElementById('sub-count-pending').textContent  = pending;
+    document.getElementById('sub-count-accepted').textContent = accepted;
+    document.getElementById('sub-count-rejected').textContent = rejected;
+  }
+}
+
+/** Returns a colored badge span for a submission status. */
+function subStatusBadge(status) {
+  const map = {
+    Pending:  'badge-warn',
+    Accepted: 'badge-success',
+    Rejected: 'badge-danger',
+  };
+  return `<span class="badge ${map[status] || ''}">${status}</span>`;
+}
+
+/** Opens the Submission Review modal and populates all fields. */
+async function openSubmissionDetail(id) {
+  _currentSubmissionId = id;
+  // Reset state
+  document.getElementById('sv-reject-input-wrap').style.display = 'none';
+  document.getElementById('sv-rejection-wrap').style.display    = 'none';
+  document.getElementById('sv-reject-reason-input').value = '';
+
+  try {
+    const s = await api(`/api/submissions/${id}`);
+
+    // Header
+    document.getElementById('sub-modal-title').textContent = `${s.lastName}, ${s.firstName}${s.middleName ? ' ' + s.middleName : ''}`;
+    document.getElementById('sub-modal-subid').textContent = s.submissionId;
+    const _badge = document.getElementById('sub-modal-badge');
+    _badge.className = 'badge ' + (s.status==='Pending'?'badge-warn':s.status==='Accepted'?'badge-success':'badge-danger');
+    _badge.textContent = s.status;
+
+    // Fill all read-only fields
+    sv('sv-fname',         s.firstName || '—');
+    sv('sv-lname',         s.lastName  || '—');
+    sv('sv-mname',         s.middleName || '—');
+    sv('sv-dob',           s.dateOfBirth || '—');
+    sv('sv-pob',           s.placeOfBirth || '—');
+    sv('sv-gender',        s.gender || '—');
+    sv('sv-email',         s.email || '—');
+    sv('sv-contact',       s.contactNumber || '—');
+    sv('sv-nationality',   s.nationality || '—');
+    sv('sv-religion',      s.religion || '—');
+    sv('sv-address',       s.address || '—');
+    sv('sv-level',         s.seminaryLevel || '—');
+    sv('sv-program',       s.appliedProgram?.programName || '—');
+    sv('sv-father',        s.fatherName || '—');
+    sv('sv-father-occ',    s.fatherOccupation || '—');
+    sv('sv-mother',        s.motherName || '—');
+    sv('sv-mother-occ',    s.motherOccupation || '—');
+    sv('sv-guardian',      s.guardianName || '—');
+    sv('sv-guardian-contact', s.guardianContact || '—');
+    sv('sv-school',        s.lastSchoolAttended || '—');
+    sv('sv-school-year',   s.lastSchoolYear || '—');
+    sv('sv-year-level',    s.lastYearLevel || '—');
+
+    // Show/hide action buttons based on status
+    const pendingActions = document.getElementById('sv-pending-actions');
+    if (s.status === 'Pending') {
+      pendingActions.style.display = 'flex';
+    } else {
+      pendingActions.style.display = 'none';
+    }
+
+    // Show rejection reason if rejected
+    if (s.status === 'Rejected' && s.rejectionReason) {
+      document.getElementById('sv-rejection-wrap').style.display = '';
+      document.getElementById('sv-rejection-reason').textContent = s.rejectionReason;
+    }
+
+    openModal('modal-submission-detail');
+  } catch (e) {
+    toast('Failed to load submission: ' + e.message, 'error');
+  }
+}
+
+/** Sets value of a read-only input inside the modal. */
+function sv(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val || '—';
+}
+
+/** Shows the inline reject reason input. */
+function showRejectInput() {
+  document.getElementById('sv-reject-input-wrap').style.display = '';
+  document.getElementById('sv-reject-reason-input').focus();
+}
+
+/** Sends the Accept request for the currently-open submission. */
+async function acceptCurrentSubmission() {
+  if (!_currentSubmissionId) return;
+  const btn = document.getElementById('sv-accept-btn');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+  try {
+    const result = await api(`/api/submissions/${_currentSubmissionId}/accept`, 'POST', {});
+    closeModal('modal-submission-detail');
+    toast(`Accepted! New applicant ID: ${result.applicantId}`, 'success');
+    loadSubmissions();
+  } catch (e) {
+    toast(e.message || 'Failed to accept submission', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Accept as Applicant';
+  }
+}
+
+/** Sends the Reject request using the reason entered in the inline input. */
+async function confirmRejectSubmission() {
+  if (!_currentSubmissionId) return;
+  const reason = document.getElementById('sv-reject-reason-input').value.trim();
+  try {
+    await api(`/api/submissions/${_currentSubmissionId}/reject`, 'POST', { reason });
+    closeModal('modal-submission-detail');
+    toast('Submission rejected.', 'success');
+    loadSubmissions();
+  } catch (e) {
+    toast(e.message || 'Failed to reject submission', 'error');
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────

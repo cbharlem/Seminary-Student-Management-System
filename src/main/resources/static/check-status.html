@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- LAYER 1 — FRONTEND (check-status.html)                                  -->
+<!-- Public Application Status Check page — no login required.               -->
+<!-- Students enter their Submission ID and email to see whether the         -->
+<!-- registrar has accepted, rejected, or is still reviewing their form.     -->
+<!--                                                                         -->
+<!-- LAYER 1 → LAYER 2:                                                      -->
+<!--   GET /api/public/check-status?submissionId=SUB-1001&email=...          -->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Check Application Status | St. Francis de Sales Seminary</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--gray-50);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--gray-800);
+  }
+
+  /* ── Top Bar ─────────────────────────────────────────── */
+  .top-bar {
+    background: var(--navy);
+    padding: 14px 32px;
+    display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .top-bar-logo {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: white; display: flex;
+    align-items: center; justify-content: center;
+    flex-shrink: 0; padding: 3px;
+  }
+  .top-bar-logo img { width: 34px; height: 34px; object-fit: contain; }
+  .top-bar-title {
+    color: white; font-size: 1rem; font-weight: 700; line-height: 1.2;
+  }
+  .top-bar-title span {
+    display: block; font-size: 0.75rem;
+    color: rgba(255,255,255,0.55); font-weight: 400;
+  }
+  .top-bar-links { margin-left: auto; display: flex; gap: 10px; }
+  .top-bar-link {
+    color: rgba(255,255,255,0.7); font-size: 0.82rem;
+    text-decoration: none; padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px; transition: all .2s;
+  }
+  .top-bar-link:hover {
+    color: white; border-color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.08);
+  }
+  /* WCAG 2.4.7 — visible focus ring for keyboard users */
+  .top-bar-link:focus-visible {
+    outline: 2px solid white; outline-offset: 3px;
+  }
+
+  /* ── Page wrapper ────────────────────────────────────── */
+  .page-wrap {
+    max-width: 520px; margin: 0 auto;
+    padding: 48px 20px 64px;
+  }
+
+  /* ── Lookup card ─────────────────────────────────────── */
+  .lookup-card {
+    background: white; border-radius: 12px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 4px 20px rgba(13,27,94,0.07);
+    padding: 36px 36px 28px;
+  }
+  .lookup-card h1 {
+    font-size: 1.45rem; font-weight: 800;
+    color: var(--navy); margin: 0 0 6px;
+  }
+  .lookup-card .sub {
+    font-size: 0.875rem; color: var(--gray-600);
+    margin: 0 0 28px; line-height: 1.6;
+  }
+
+  /* ── Fields ──────────────────────────────────────────── */
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--gray-600); margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid var(--gray-200); border-radius: 7px;
+    font-size: 0.92rem; font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--gray-800); outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(46,75,189,0.08);
+  }
+
+  /* ── Submit button ───────────────────────────────────── */
+  .btn-check {
+    width: 100%; padding: 13px;
+    background: var(--navy); color: white; border: none;
+    border-radius: 8px; font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: background .2s; margin-top: 4px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-check:hover:not(:disabled) { background: var(--navy-mid); }
+  .btn-check:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-check .spin {
+    display: none; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white; border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-check.loading .spin { display: inline-block; }
+
+  /* ── Error msg ───────────────────────────────────────── */
+  .msg-error {
+    padding: 11px 14px; border-radius: 7px;
+    background: var(--danger-bg); color: var(--danger);
+    font-size: 0.86rem; line-height: 1.5;
+    margin-bottom: 16px; display: none;
+  }
+  .msg-error.show { display: block; }
+
+  /* ── Result card ─────────────────────────────────────── */
+  #result-card {
+    display: none;
+    background: white; border-radius: 12px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 4px 20px rgba(13,27,94,0.07);
+    overflow: hidden; margin-top: 20px;
+  }
+  #result-card.show { display: block; }
+
+  .result-header {
+    padding: 22px 28px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .result-name { font-size: 1.1rem; font-weight: 700; color: var(--navy); }
+  .result-sub  { font-size: 0.8rem; color: var(--gray-400); margin-top: 2px; }
+
+  .result-status-block {
+    padding: 24px 28px;
+    text-align: center;
+  }
+
+  /* ── Status icons & messages ─────────────────────────── */
+  .status-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .status-icon.pending  { background: var(--warn-bg);    color: var(--warn); }
+  .status-icon.accepted { background: var(--success-bg); color: var(--success); }
+  .status-icon.rejected { background: var(--danger-bg);  color: var(--danger); }
+
+  .status-title {
+    font-size: 1.2rem; font-weight: 800; margin: 0 0 8px;
+  }
+  .status-title.pending  { color: var(--warn); }
+  .status-title.accepted { color: var(--success); }
+  .status-title.rejected { color: var(--danger); }
+
+  .status-message {
+    font-size: 0.9rem; color: var(--gray-600);
+    line-height: 1.7; max-width: 380px; margin: 0 auto;
+  }
+
+  .rejection-reason {
+    margin-top: 16px; padding: 12px 16px;
+    background: var(--danger-bg); border-radius: 8px;
+    font-size: 0.86rem; color: var(--danger);
+    text-align: left; line-height: 1.6;
+  }
+  .rejection-reason strong { display: block; margin-bottom: 4px; }
+
+  .result-details {
+    padding: 0 28px 24px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px;
+  }
+  .detail-item label {
+    display: block; font-size: 0.75rem; font-weight: 700;
+    /* WCAG 1.4.3 — gray-600 (#4a5270) gives ~7:1 on white, passing AA for small text */
+    color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 3px;
+  }
+  .detail-item span { font-size: 0.88rem; color: var(--gray-800); }
+
+  /* ── Try again link ──────────────────────────────────── */
+  .try-again {
+    text-align: center; margin-top: 14px;
+    font-size: 0.82rem; color: var(--gray-400);
+  }
+  .try-again a { color: var(--accent); text-decoration: none; }
+  .try-again a:hover { text-decoration: underline; }
+
+  /* ── Footer ──────────────────────────────────────────── */
+  .page-footer {
+    text-align: center; margin-top: 36px;
+    font-size: 0.72rem; color: var(--gray-400);
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar" role="banner">
+  <div class="top-bar-logo">
+    <img src="/images/seminaryLogo.png" alt="Seminary Logo"/>
+  </div>
+  <div class="top-bar-title">
+    Application Status Check
+    <span>St. Francis de Sales Major Seminary</span>
+  </div>
+  <div class="top-bar-links">
+    <a href="/apply.html" class="top-bar-link">Apply Online</a>
+    <a href="/login.html" class="top-bar-link">System Login</a>
+  </div>
+</div>
+
+<main class="page-wrap" role="main">
+
+  <!-- Lookup form -->
+  <div class="lookup-card">
+    <h1>Check Your Application</h1>
+    <p class="sub">Enter the Submission ID you received after applying and the email address you used on the form.</p>
+
+    <div class="msg-error" id="msg-error" role="alert" aria-live="polite"></div>
+
+    <div class="field">
+      <label for="inp-sub-id">Submission ID <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="inp-sub-id" placeholder="e.g. SUB-1001" autocomplete="off"
+             style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/>
+    </div>
+    <div class="field">
+      <label for="inp-email">Email Address <span style="color:var(--danger)">*</span></label>
+      <input type="email" id="inp-email" placeholder="The email you used when applying" autocomplete="email"/>
+    </div>
+
+    <button class="btn-check" id="btn-check" onclick="checkStatus()">
+      <span class="spin" aria-hidden="true"></span>
+      Check Status
+    </button>
+  </div>
+
+  <!-- Result card (hidden until a successful lookup) -->
+  <!-- tabindex="-1" allows programmatic focus move after form is hidden (WCAG 2.4.3) -->
+  <div id="result-card" role="status" aria-live="polite" tabindex="-1">
+
+    <div class="result-header">
+      <div>
+        <div class="result-name" id="res-name"></div>
+        <div class="result-sub" id="res-subid"></div>
+      </div>
+      <span class="badge" id="res-badge"></span>
+    </div>
+
+    <div class="result-status-block">
+      <div class="status-icon" id="res-icon">
+        <!-- SVG injected by JS -->
+      </div>
+      <div class="status-title" id="res-title"></div>
+      <p class="status-message" id="res-message"></p>
+      <div class="rejection-reason" id="res-rejection" style="display:none">
+        <strong>Reason provided by the registrar:</strong>
+        <span id="res-rejection-text"></span>
+      </div>
+    </div>
+
+    <div class="result-details">
+      <div class="detail-item">
+        <label>Program Applied</label>
+        <span id="res-program"></span>
+      </div>
+      <div class="detail-item">
+        <label>Seminary Level</label>
+        <span id="res-level"></span>
+      </div>
+      <div class="detail-item">
+        <label>Date Submitted</label>
+        <span id="res-submitted"></span>
+      </div>
+      <div class="detail-item">
+        <label>Date Reviewed</label>
+        <span id="res-reviewed"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="try-again" id="try-again-link" style="display:none">
+    <a href="#" onclick="resetForm(); return false;">Check a different submission</a>
+  </div>
+
+  <div class="page-footer">
+    &copy; 2026 St. Francis de Sales Major Seminary &nbsp;&bull;&nbsp; Student Management System
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — FRONTEND LOGIC (check-status.html)
+// Calls GET /api/public/check-status?submissionId=...&email=...
+// and renders the result based on the returned status.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ICONS = {
+  Pending: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
+    </svg>`,
+  Accepted: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>`,
+  Rejected: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="15" y1="9" x2="9" y2="15"/>
+      <line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>`,
+};
+
+const MESSAGES = {
+  Pending: 'Your application is currently under review. The registrar will assess the information you provided and notify you of the result. Please check back here regularly.',
+  Accepted: 'Congratulations! Your application has been accepted. You are now officially listed as an applicant. Please visit the registrar\'s office to proceed with the next steps of the admission process.',
+  Rejected: 'We regret to inform you that your application was not approved at this time. Please review the reason provided below and contact the registrar\'s office if you have any questions.',
+};
+
+async function checkStatus() {
+  const subId = document.getElementById('inp-sub-id').value.trim();
+  const email = document.getElementById('inp-email').value.trim();
+  const errEl = document.getElementById('msg-error');
+  const btn   = document.getElementById('btn-check');
+
+  // Hide previous results
+  errEl.classList.remove('show');
+  document.getElementById('result-card').classList.remove('show');
+  document.getElementById('try-again-link').style.display = 'none';
+
+  if (!subId) return showErr('Please enter your Submission ID.');
+  if (!email) return showErr('Please enter your email address.');
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  try {
+    const res = await fetch(
+      `/api/public/check-status?submissionId=${encodeURIComponent(subId)}&email=${encodeURIComponent(email)}`
+    );
+    const data = await res.json();
+
+    if (!res.ok) {
+      showErr(data.error || 'Submission not found. Please check your details.');
+      return;
+    }
+
+    renderResult(data);
+  } catch {
+    showErr('A network error occurred. Please check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+function renderResult(d) {
+  const status = d.status; // Pending | Accepted | Rejected
+
+  // Header
+  document.getElementById('res-name').textContent  = `${d.firstName} ${d.lastName}`;
+  document.getElementById('res-subid').textContent = d.submissionId;
+
+  const badge = document.getElementById('res-badge');
+  badge.textContent = status;
+  badge.className   = 'badge ' + (status==='Pending'?'badge-warn':status==='Accepted'?'badge-success':'badge-danger');
+
+  // Status block
+  const icon = document.getElementById('res-icon');
+  icon.innerHTML  = ICONS[status] || '';
+  icon.className  = 'status-icon ' + status.toLowerCase();
+
+  const title = document.getElementById('res-title');
+  title.textContent = status === 'Pending' ? 'Under Review'
+                    : status === 'Accepted' ? 'Application Accepted'
+                    : 'Application Not Approved';
+  title.className = 'status-title ' + status.toLowerCase();
+
+  document.getElementById('res-message').textContent = MESSAGES[status] || '';
+
+  // Rejection reason
+  const rejWrap = document.getElementById('res-rejection');
+  if (status === 'Rejected' && d.rejectionReason) {
+    document.getElementById('res-rejection-text').textContent = d.rejectionReason;
+    rejWrap.style.display = '';
+  } else {
+    rejWrap.style.display = 'none';
+  }
+
+  // Details
+  document.getElementById('res-program').textContent   = d.programName   || '—';
+  document.getElementById('res-level').textContent     = d.seminaryLevel || '—';
+  document.getElementById('res-submitted').textContent = formatDate(d.submittedAt);
+  document.getElementById('res-reviewed').textContent  = d.reviewedAt ? formatDate(d.reviewedAt) : 'Not yet reviewed';
+
+  document.querySelector('.lookup-card').style.display = 'none';
+  document.getElementById('result-card').classList.add('show');
+  document.getElementById('try-again-link').style.display = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // WCAG 2.4.3 — move keyboard focus to the result card so screen reader
+  // users aren't left on the now-hidden submit button
+  document.getElementById('result-card').focus();
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+  } catch { return iso.substring(0, 10); }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('msg-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function resetForm() {
+  document.getElementById('result-card').classList.remove('show');
+  document.getElementById('try-again-link').style.display = 'none';
+  document.getElementById('msg-error').classList.remove('show');
+  document.getElementById('inp-sub-id').value = '';
+  document.getElementById('inp-email').value  = '';
+  document.querySelector('.lookup-card').style.display = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('inp-sub-id').focus();
+}
+
+// Allow pressing Enter from either input field
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkStatus();
+});
+
+// Pre-fill from URL params if linked from apply.html with ?id=SUB-1001
+const params = new URLSearchParams(window.location.search);
+if (params.get('id')) document.getElementById('inp-sub-id').value = params.get('id').toUpperCase();
+</script>
+</body>
+</html>

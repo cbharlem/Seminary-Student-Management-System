@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- LAYER 1 — FRONTEND (apply.html)                                         -->
+<!-- Public Online Admission Form — no login required.                       -->
+<!-- Students fill out this page and submit their admission application.     -->
+<!-- Their data is stored in tblonline_submissions (status: Pending).        -->
+<!-- The registrar reviews each submission in the Submissions screen of      -->
+<!-- index.html before it becomes an official applicant record.              -->
+<!--                                                                         -->
+<!-- LAYER 1 → LAYER 2:                                                      -->
+<!--   GET  /api/public/programs   → populates the program dropdown          -->
+<!--   POST /api/public/apply      → submits the form                        -->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Online Admission | St. Francis de Sales Seminary</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--gray-50);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--gray-800);
+  }
+
+  /* ── Top Bar ─────────────────────────────────────────── */
+  .top-bar {
+    background: var(--navy);
+    padding: 14px 32px;
+    display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .top-bar-logo {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: white; display: flex;
+    align-items: center; justify-content: center;
+    flex-shrink: 0; padding: 3px;
+  }
+  .top-bar-logo img { width: 34px; height: 34px; object-fit: contain; }
+  .top-bar-title {
+    color: white;
+    font-size: 1rem; font-weight: 700; line-height: 1.2;
+  }
+  .top-bar-title span {
+    display: block; font-size: 0.75rem;
+    color: rgba(255,255,255,0.55); font-weight: 400;
+  }
+  .top-bar-link {
+    margin-left: auto;
+    color: rgba(255,255,255,0.7); font-size: 0.82rem;
+    text-decoration: none;
+    padding: 6px 14px; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px; transition: all .2s;
+  }
+  .top-bar-link:hover {
+    color: white; border-color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.08);
+  }
+  /* WCAG 2.4.7 — visible focus ring for keyboard users */
+  .top-bar-link:focus-visible {
+    outline: 2px solid white; outline-offset: 3px;
+  }
+
+  /* ── Page wrapper ────────────────────────────────────── */
+  .page-wrap {
+    max-width: 780px; margin: 0 auto;
+    padding: 36px 20px 64px;
+  }
+
+  /* ── Page header ─────────────────────────────────────── */
+  .page-header {
+    margin-bottom: 28px;
+  }
+  .page-header h1 {
+    font-size: 1.6rem; font-weight: 800;
+    color: var(--navy); margin: 0 0 6px;
+  }
+  .page-header p {
+    font-size: 0.9rem; color: var(--gray-600); margin: 0;
+    line-height: 1.6;
+  }
+
+  /* ── Form card ───────────────────────────────────────── */
+  .form-card {
+    background: white; border-radius: 10px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 2px 12px rgba(13,27,94,0.06);
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .form-card-header {
+    padding: 14px 24px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 0.78rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--gray-600);
+  }
+  .form-card-body {
+    padding: 20px 24px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px;
+  }
+  .form-card-body .full { grid-column: 1 / -1; }
+
+  /* ── Field ───────────────────────────────────────────── */
+  .field label {
+    display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--gray-600); margin-bottom: 6px;
+  }
+  .field label .req { color: var(--danger); margin-left: 2px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 10px 14px;
+    border: 1.5px solid var(--gray-200); border-radius: 7px;
+    font-size: 0.9rem; font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--gray-800); outline: none;
+    transition: border-color .2s; background: white;
+    -webkit-appearance: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(46,75,189,0.08);
+  }
+  .field textarea { resize: vertical; min-height: 72px; }
+  .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a94b0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+  /* ── Submit section ──────────────────────────────────── */
+  .submit-section {
+    text-align: center; padding: 8px 0 0;
+  }
+  .btn-submit {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 40px;
+    background: var(--navy); color: white; border: none;
+    border-radius: 8px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: background .2s; letter-spacing: 0.01em;
+  }
+  .btn-submit:hover:not(:disabled) { background: var(--navy-mid); }
+  .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-submit .spin {
+    display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white; border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-submit.loading .spin { display: inline-block; }
+  .btn-submit.loading .btn-label { opacity: 0.7; }
+
+  /* ── Feedback messages ───────────────────────────────── */
+  .msg {
+    padding: 12px 16px; border-radius: 8px;
+    font-size: 0.88rem; line-height: 1.5;
+    margin-bottom: 20px; display: none;
+  }
+  .msg.show { display: block; }
+  .msg.error { background: var(--danger-bg); color: var(--danger); }
+  .msg.success { background: var(--success-bg); color: var(--success); }
+  .msg.info { background: var(--info-bg); color: var(--info); }
+
+  /* ── Success screen ──────────────────────────────────── */
+  #success-screen {
+    display: none; text-align: center;
+    padding: 60px 32px;
+    background: white; border-radius: 10px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 2px 12px rgba(13,27,94,0.06);
+  }
+  #success-screen.show { display: block; }
+  .success-icon {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: var(--success-bg); margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .success-icon svg { color: var(--success); }
+  #success-screen h2 {
+    font-size: 1.45rem; font-weight: 800;
+    color: var(--navy); margin: 0 0 10px;
+  }
+  #success-screen p {
+    color: var(--gray-600); font-size: 0.92rem;
+    max-width: 480px; margin: 0 auto 6px; line-height: 1.65;
+  }
+  .sub-id-badge {
+    display: inline-block; margin-top: 18px;
+    padding: 8px 20px; background: var(--gray-50);
+    border: 1px solid var(--gray-200); border-radius: 20px;
+    font-size: 0.82rem; color: var(--gray-600);
+  }
+  .sub-id-badge strong { color: var(--navy); font-weight: 700; }
+
+  /* ── Footer ──────────────────────────────────────────── */
+  .page-footer {
+    text-align: center; margin-top: 40px;
+    font-size: 0.72rem; color: var(--gray-400);
+  }
+
+  @media (max-width: 600px) {
+    .form-card-body { grid-template-columns: 1fr; }
+    .form-card-body .full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top navigation bar -->
+<div class="top-bar" role="banner">
+  <div class="top-bar-logo">
+    <img src="/images/seminaryLogo.png" alt="Seminary Logo"/>
+  </div>
+  <div class="top-bar-title">
+    Online Admission Application
+    <span>St. Francis de Sales Major Seminary</span>
+  </div>
+  <a href="/login.html" class="top-bar-link" aria-label="Go to system login">System Login</a>
+</div>
+
+<main class="page-wrap" role="main">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Admission Application Form</h1>
+    <p>Please fill in all required fields accurately. Your submission will be reviewed by the registrar
+       before you are officially listed as an applicant.</p>
+  </div>
+
+  <!-- Global error message -->
+  <div class="msg error" id="msg-error" role="alert" aria-live="polite"></div>
+
+  <!-- Success screen (shown after submit) -->
+  <div id="success-screen" role="status" aria-live="polite">
+    <div class="success-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h2>Application Submitted!</h2>
+    <p>Thank you for submitting your application to St. Francis de Sales Major Seminary.</p>
+    <p>The registrar will review your information and contact you once it has been processed.
+       Please keep a record of your submission ID below.</p>
+    <div class="sub-id-badge">Submission ID: <strong id="sub-id-display">—</strong></div>
+    <p style="margin-top:20px;font-size:0.85rem;color:var(--gray-600)">
+      Want to check if the registrar has reviewed your application?
+    </p>
+    <a id="check-status-link" href="/check-status.html" style="
+      display:inline-block; margin-top:6px; padding:10px 24px;
+      background:var(--gray-50); border:1.5px solid var(--gray-200);
+      border-radius:8px; font-size:0.88rem; font-weight:600;
+      color:var(--navy); text-decoration:none; transition:all .2s;">
+      Check Application Status
+    </a>
+  </div>
+
+  <!-- The main form -->
+  <form id="apply-form" novalidate autocomplete="on">
+
+    <!-- Section 1: Personal Information -->
+    <div class="form-card">
+      <div class="form-card-header">Personal Information</div>
+      <div class="form-card-body">
+        <div class="field">
+          <label for="firstName">First Name <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="firstName" name="firstName" required autocomplete="given-name"
+                 placeholder="e.g. Juan"/>
+        </div>
+        <div class="field">
+          <label for="lastName">Last Name <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="lastName" name="lastName" required autocomplete="family-name"
+                 placeholder="e.g. dela Cruz"/>
+        </div>
+        <div class="field">
+          <label for="middleName">Middle Name</label>
+          <input type="text" id="middleName" name="middleName" autocomplete="additional-name"
+                 placeholder="e.g. Santos"/>
+        </div>
+        <div class="field">
+          <label for="dateOfBirth">Date of Birth <span class="req" aria-hidden="true">*</span></label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth" required autocomplete="bday"/>
+        </div>
+        <div class="field">
+          <label for="placeOfBirth">Place of Birth</label>
+          <input type="text" id="placeOfBirth" name="placeOfBirth"
+                 placeholder="e.g. Lipa City, Batangas"/>
+        </div>
+        <div class="field">
+          <label for="gender">Gender</label>
+          <select id="gender" name="gender">
+            <option value="">— Select —</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Contact & Identity -->
+    <div class="form-card">
+      <div class="form-card-header">Contact &amp; Identity</div>
+      <div class="form-card-body">
+        <div class="field">
+          <label for="email">Email Address <span class="req" aria-hidden="true">*</span></label>
+          <input type="email" id="email" name="email" required autocomplete="email"
+                 placeholder="e.g. juan@example.com"/>
+        </div>
+        <div class="field">
+          <label for="contactNumber">Contact Number</label>
+          <input type="tel" id="contactNumber" name="contactNumber" autocomplete="tel"
+                 placeholder="e.g. 09171234567"/>
+        </div>
+        <div class="field">
+          <label for="nationality">Nationality</label>
+          <input type="text" id="nationality" name="nationality" autocomplete="off"
+                 placeholder="e.g. Filipino"/>
+        </div>
+        <div class="field">
+          <label for="religion">Religion</label>
+          <input type="text" id="religion" name="religion" autocomplete="off"
+                 placeholder="e.g. Roman Catholic"/>
+        </div>
+        <div class="field full">
+          <label for="address">Complete Address</label>
+          <textarea id="address" name="address" autocomplete="street-address" rows="3"
+                    placeholder="House/Unit No., Street, Barangay, City/Municipality, Province"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Seminary Enrollment -->
+    <div class="form-card">
+      <div class="form-card-header">Seminary Enrollment</div>
+      <div class="form-card-body">
+        <div class="field">
+          <label for="seminaryLevel">Seminary Level <span class="req" aria-hidden="true">*</span></label>
+          <select id="seminaryLevel" name="seminaryLevel" required>
+            <option value="">— Select —</option>
+            <option value="Propaedeutic">Propaedeutic</option>
+            <option value="College">College</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="appliedProgram">Applied Program <span class="req" aria-hidden="true">*</span></label>
+          <select id="appliedProgram" name="appliedProgram" required>
+            <option value="">— Loading programs… —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Family Background -->
+    <div class="form-card">
+      <div class="form-card-header">Family Background</div>
+      <div class="form-card-body">
+        <div class="field">
+          <label for="fatherName">Father's Full Name</label>
+          <input type="text" id="fatherName" name="fatherName" autocomplete="off"
+                 placeholder="e.g. Pedro dela Cruz"/>
+        </div>
+        <div class="field">
+          <label for="fatherOccupation">Father's Occupation</label>
+          <input type="text" id="fatherOccupation" name="fatherOccupation" autocomplete="off"
+                 placeholder="e.g. Farmer"/>
+        </div>
+        <div class="field">
+          <label for="motherName">Mother's Full Name</label>
+          <input type="text" id="motherName" name="motherName" autocomplete="off"
+                 placeholder="e.g. Maria Santos"/>
+        </div>
+        <div class="field">
+          <label for="motherOccupation">Mother's Occupation</label>
+          <input type="text" id="motherOccupation" name="motherOccupation" autocomplete="off"
+                 placeholder="e.g. Teacher"/>
+        </div>
+        <div class="field">
+          <label for="guardianName">Guardian's Name <span style="font-weight:400;color:var(--gray-400)">(if applicable)</span></label>
+          <input type="text" id="guardianName" name="guardianName" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label for="guardianContact">Guardian's Contact</label>
+          <input type="tel" id="guardianContact" name="guardianContact" autocomplete="off"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Previous Education -->
+    <div class="form-card">
+      <div class="form-card-header">Previous Education</div>
+      <div class="form-card-body">
+        <div class="field full">
+          <label for="lastSchoolAttended">Last School Attended</label>
+          <input type="text" id="lastSchoolAttended" name="lastSchoolAttended" autocomplete="off"
+                 placeholder="e.g. St. Joseph High School"/>
+        </div>
+        <div class="field">
+          <label for="lastSchoolYear">School Year</label>
+          <input type="text" id="lastSchoolYear" name="lastSchoolYear" autocomplete="off"
+                 placeholder="e.g. 2023-2024"/>
+        </div>
+        <div class="field">
+          <label for="lastYearLevel">Year Level / Grade</label>
+          <input type="text" id="lastYearLevel" name="lastYearLevel" autocomplete="off"
+                 placeholder="e.g. Grade 12 / 4th Year"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="submit-section">
+      <div class="msg info" id="msg-info" style="text-align:left">
+        Please double-check all information before submitting. You may not edit your submission after it is sent.
+      </div>
+      <div class="msg error" id="msg-submit-error" role="alert"></div>
+      <button type="submit" class="btn-submit" id="btn-submit">
+        <span class="spin" aria-hidden="true"></span>
+        <span class="btn-label">Submit Application</span>
+      </button>
+      <p style="margin-top:14px;font-size:0.8rem;color:var(--gray-600)">
+        Fields marked <span style="color:var(--danger);font-weight:700">*</span> are required.
+      </p>
+    </div>
+
+  </form>
+
+  <div class="page-footer">
+    &copy; 2026 St. Francis de Sales Major Seminary &nbsp;&bull;&nbsp; Student Management System
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — FRONTEND LOGIC (apply.html)
+// Loads programs on page load, handles form submission via fetch API.
+// No auth needed — all calls go to /api/public/**.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const form       = document.getElementById('apply-form');
+const btnSubmit  = document.getElementById('btn-submit');
+const msgError   = document.getElementById('msg-error');
+const msgInfo    = document.getElementById('msg-info');
+const msgSubmitError = document.getElementById('msg-submit-error');
+const successScreen  = document.getElementById('success-screen');
+
+// ── Load programs into dropdown ──────────────────────────────────────────────
+async function loadPrograms() {
+  const select = document.getElementById('appliedProgram');
+  try {
+    const res = await fetch('/api/public/programs');
+    if (!res.ok) throw new Error('Failed to load programs');
+    const programs = await res.json();
+    select.innerHTML = '<option value="">— Select a program —</option>' +
+      programs.map(p => `<option value="${esc(p.programId)}">${esc(p.programName)}</option>`).join('');
+  } catch {
+    select.innerHTML = '<option value="">— Unable to load programs —</option>';
+    showError(msgError, 'Could not load programs. Please refresh the page and try again.');
+  }
+}
+
+// ── Form submission ──────────────────────────────────────────────────────────
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg(msgError);
+  hideMsg(msgSubmitError);
+
+  // Client-side validation — WCAG 2.1 / Nielsen #9 (error prevention)
+  const firstName = val('firstName');
+  const lastName  = val('lastName');
+  const dob       = val('dateOfBirth');
+  const email     = val('email');
+  const level     = val('seminaryLevel');
+  const program   = val('appliedProgram');
+
+  if (!firstName) return showError(msgError, 'First name is required.');
+  if (!lastName)  return showError(msgError, 'Last name is required.');
+  if (!dob)       return showError(msgError, 'Date of birth is required.');
+  if (!email)     return showError(msgError, 'Email address is required.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return showError(msgError, 'Please enter a valid email address.');
+  if (!level)   return showError(msgError, 'Seminary level is required.');
+  if (!program) return showError(msgError, 'Applied program is required.');
+
+  // Build request body matching OnlineSubmission fields
+  const body = {
+    firstName,
+    middleName:         val('middleName')         || null,
+    lastName,
+    dateOfBirth:        dob,
+    placeOfBirth:       val('placeOfBirth')        || null,
+    gender:             val('gender')              || null,
+    email,
+    contactNumber:      val('contactNumber')       || null,
+    nationality:        val('nationality')         || null,
+    religion:           val('religion')            || null,
+    address:            val('address')             || null,
+    fatherName:         val('fatherName')          || null,
+    fatherOccupation:   val('fatherOccupation')    || null,
+    motherName:         val('motherName')          || null,
+    motherOccupation:   val('motherOccupation')    || null,
+    guardianName:       val('guardianName')        || null,
+    guardianContact:    val('guardianContact')     || null,
+    lastSchoolAttended: val('lastSchoolAttended')  || null,
+    lastSchoolYear:     val('lastSchoolYear')      || null,
+    lastYearLevel:      val('lastYearLevel')       || null,
+    seminaryLevel:      level,
+    appliedProgram: { programId: program }
+  };
+
+  // Show loading state
+  btnSubmit.disabled = true;
+  btnSubmit.classList.add('loading');
+
+  try {
+    const res = await fetch('/api/public/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showError(msgError, data.error || 'Submission failed. Please try again.');
+      return;
+    }
+
+    // Show success screen
+    document.getElementById('sub-id-display').textContent = data.submissionId;
+    // Pre-fill the check-status link with the new SUB-ID so one click takes them straight there
+    document.getElementById('check-status-link').href =
+      '/check-status.html?id=' + encodeURIComponent(data.submissionId);
+    form.style.display = 'none';
+    msgInfo.classList.remove('show');
+    successScreen.classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch {
+    showError(msgError, 'A network error occurred. Please check your connection and try again.');
+  } finally {
+    btnSubmit.disabled = false;
+    btnSubmit.classList.remove('loading');
+  }
+});
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function val(id)        { return document.getElementById(id)?.value?.trim() || ''; }
+function esc(s)         { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showError(el, msg) { el.textContent = msg; el.classList.add('show'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function hideMsg(el)    { el.classList.remove('show'); }
+
+// Show the info note once the page settles
+window.addEventListener('load', () => {
+  msgInfo.classList.add('show');
+  loadPrograms();
+});
+</script>
+</body>
+</html>

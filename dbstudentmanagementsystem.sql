@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS `tblinstructors`;
 DROP TABLE IF EXISTS `tbldocuments`;
 DROP TABLE IF EXISTS `tblstudents`;
 DROP TABLE IF EXISTS `tblentranceexam`;
+DROP TABLE IF EXISTS `tblonline_submissions`;
 DROP TABLE IF EXISTS `tblapplications`;
 DROP TABLE IF EXISTS `tblapplicants`;
 DROP TABLE IF EXISTS `tblprerequisites`;
@@ -608,11 +609,50 @@ CREATE TABLE `tblbackuplog` (
   FOREIGN KEY (`fldPerformedByIndex`) REFERENCES `tblusers`(`fldIndex`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================================
+-- MODULE 14: ONLINE ADMISSION SUBMISSIONS
+-- Students fill out apply.html; their data is stored here
+-- pending registrar review before becoming official applicants.
+-- ============================================================
+
+CREATE TABLE `tblonline_submissions` (
+  `fldIndex`              INT(11) NOT NULL AUTO_INCREMENT,
+  `fldSubmissionID`       VARCHAR(30) NOT NULL UNIQUE,
+  `fldFirstName`          VARCHAR(50) NOT NULL,
+  `fldMiddleName`         VARCHAR(50) DEFAULT NULL,
+  `fldLastName`           VARCHAR(50) NOT NULL,
+  `fldDateOfBirth`        DATE NOT NULL,
+  `fldPlaceOfBirth`       VARCHAR(100) DEFAULT NULL,
+  `fldGender`             ENUM('Male','Female','Other') DEFAULT NULL,
+  `fldAddress`            VARCHAR(255) DEFAULT NULL,
+  `fldContactNumber`      VARCHAR(20) DEFAULT NULL,
+  `fldEmail`              VARCHAR(100) NOT NULL,
+  `fldNationality`        VARCHAR(50) DEFAULT NULL,
+  `fldReligion`           VARCHAR(50) DEFAULT NULL,
+  `fldFatherName`         VARCHAR(100) DEFAULT NULL,
+  `fldFatherOccupation`   VARCHAR(100) DEFAULT NULL,
+  `fldMotherName`         VARCHAR(100) DEFAULT NULL,
+  `fldMotherOccupation`   VARCHAR(100) DEFAULT NULL,
+  `fldGuardianName`       VARCHAR(100) DEFAULT NULL,
+  `fldGuardianContact`    VARCHAR(20) DEFAULT NULL,
+  `fldLastSchoolAttended` VARCHAR(150) DEFAULT NULL,
+  `fldLastSchoolYear`     VARCHAR(20) DEFAULT NULL,
+  `fldLastYearLevel`      VARCHAR(50) DEFAULT NULL,
+  `fldSeminaryLevel`      ENUM('Propaedeutic','College') DEFAULT NULL,
+  `fldProgramIndex`       INT(11) DEFAULT NULL,
+  `fldStatus`             ENUM('Pending','Accepted','Rejected') NOT NULL DEFAULT 'Pending',
+  `fldRejectionReason`    VARCHAR(255) DEFAULT NULL,
+  `fldSubmittedAt`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fldReviewedAt`         TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`fldIndex`),
+  FOREIGN KEY (`fldProgramIndex`) REFERENCES `tblprogram` (`fldIndex`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 COMMIT;
 
 -- ============================================================
 -- END OF SCHEMA
--- Tables: 22 total
+-- Tables: 23 total
 --   1.  tblusers
 --   2.  tblprogram
 --   3.  tblschoolyear
@@ -635,4 +675,5 @@ COMMIT;
 --   20. tblreports
 --   21. tblalumni
 --   22. tblbackuplog
+--   23. tblonline_submissions
 -- ============================================================

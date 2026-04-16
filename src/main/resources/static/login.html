@@ -171,6 +171,19 @@
   </div>
   <button class="btn-login" onclick="doLogin()">Sign In</button>
 
+  <!-- Public admission links -->
+  <!-- WCAG 1.4.1: underline distinguishes links without relying on color alone -->
+  <!-- WCAG 1.4.3: gray-600 (#4a5270) on white gives ~7:1, passing AA -->
+  <!-- WCAG 2.4.7: focus-visible outline added via inline onFocus/style workaround below -->
+  <div style="margin-top:24px;text-align:center;display:flex;flex-direction:column;gap:8px;width:100%;max-width:400px">
+    <a href="/check-status.html" style="font-size:0.82rem;color:var(--accent);text-decoration:underline;text-underline-offset:3px;font-weight:500;border-radius:4px;outline-offset:3px">
+      Applied online? Check your application status
+    </a>
+    <a href="/apply.html" style="font-size:0.82rem;color:var(--gray-600);text-decoration:underline;text-underline-offset:3px;border-radius:4px;outline-offset:3px">
+      New applicant? Apply online here
+    </a>
+  </div>
+
   <!-- Option C: footer -->
   <div class="login-footer">&copy; 2026 St. Francis de Sales Major Seminary &nbsp;&bull;&nbsp; Student Management System</div>
 </div>

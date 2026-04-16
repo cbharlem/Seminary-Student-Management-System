@@ -625,3 +625,6 @@ thead th.sortable.sort-desc::after {
   .main            { padding: 16px; }
   .modal-grid      { grid-template-columns: 1fr; }
 }
+
+/* Read-only display inputs in modals (e.g. Submission Review) */
+.input-readonly { background: var(--gray-50); color: var(--gray-700,#374151); cursor: default; }

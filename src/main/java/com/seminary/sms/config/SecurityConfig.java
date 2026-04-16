@@ -96,7 +96,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Static files — always accessible (login page, CSS, JS)
                 .requestMatchers(
-                    "/login.html", "/login",
+                    "/login.html", "/login", "/apply.html", "/check-status.html",
                     "/css/**", "/js/**", "/images/**",
                     "/favicon.ico",
                     "/api/public/**"
