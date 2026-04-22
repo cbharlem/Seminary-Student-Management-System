@@ -306,7 +306,7 @@ class ApplicantController {
                         .applicant(applicant)
                         .applicationDate(java.time.LocalDate.now())
                         .schoolYear(activeYear2)
-                        .applicationStatus(Application.ApplicationStatus.Confirmed)
+                        .applicationStatus(Application.ApplicationStatus.AspiringConventionAttended)
                         .build();
                     return applicationRepository.save(newApp);
                 });

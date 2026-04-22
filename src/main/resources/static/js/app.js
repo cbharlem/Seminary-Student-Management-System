@@ -196,11 +196,11 @@ async function loadApplicants() {
     document.getElementById('pc-applied').textContent    = count('Applied');
     document.getElementById('pc-interviewed').textContent= count('Interviewed');
     document.getElementById('pc-convention').textContent = count('AspiringConventionAttended');
-    document.getElementById('pc-confirmed').textContent  = count('Confirmed');
+    document.getElementById('pc-admitted').textContent   = count('Admitted');
     document.getElementById('pc-enrolled').textContent   = count('Enrolled');
 
     const statusFilter = document.getElementById('filter-applicant-status')?.value ?? 'active';
-    const ACTIVE_STATUSES = ['Applied','Interviewed','AspiringConventionAttended','Confirmed','Admitted'];
+    const ACTIVE_STATUSES = ['Applied','Interviewed','AspiringConventionAttended','Admitted'];
     const filtered = statusFilter === 'active'
       ? data.filter(a => ACTIVE_STATUSES.includes(a.applicationStatus || 'Applied'))
       : statusFilter
@@ -1682,9 +1682,9 @@ async function viewApplicantDetail(id) {
       document.getElementById('apd-status-view').textContent = 'Applied';
     }
 
-    // Show Admit button only when Confirmed and not already enrolled
+    // Show Admit button only when convention is done and not yet admitted
     document.getElementById('apd-admit-btn').style.display =
-      currentStatus === 'Confirmed' ? '' : 'none';
+      currentStatus === 'AspiringConventionAttended' ? '' : 'none';
 
     // Load exams
     try {
@@ -1741,7 +1741,7 @@ function applicantEditMode(on) {
   document.getElementById('apd-status-view').style.display = on ? 'none' : '';
   document.getElementById('apd-status').style.display      = on ? '' : 'none';
   document.getElementById('apd-edit-btn').style.display    = on ? 'none' : '';
-  document.getElementById('apd-admit-btn').style.display   = on ? 'none' : (document.getElementById('apd-status').value === 'Confirmed' ? '' : 'none');
+  document.getElementById('apd-admit-btn').style.display   = on ? 'none' : (document.getElementById('apd-status').value === 'AspiringConventionAttended' ? '' : 'none');
   document.getElementById('apd-actions').style.display     = on ? '' : 'none';
   document.getElementById('apd-modal').classList.toggle('editing', on);
 }

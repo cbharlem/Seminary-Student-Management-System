@@ -100,14 +100,18 @@ function toast(msg, type = 'success') {
 function badge(text, forceType) {
   const map = {
     Active:'success', Enrolled:'success', Passed:'success', Active:'success',
-    Applied:'info', Interviewed:'info', Confirmed:'info', College:'info',
+    Applied:'info', Interviewed:'info', College:'info',
     Inactive:'gray', LOA:'gray', Propaedeutic:'gray', NotYetGraded:'gray', Pending:'gray',
     Failed:'danger', Rejected:'danger', Dismissed:'danger',
     Incomplete:'warn', AspiringConventionAttended:'warn', Withdrawn:'warn', Alumni:'warn',
   };
+  const labels = {
+    AspiringConventionAttended: 'Convention Attended',
+    NotYetGraded: 'Not Yet Graded',
+  };
   const cls = forceType || map[text] || 'gray';
   // SECURITY (A03): Escape badge text — badge values can come from API/user data
-  return `<span class="badge badge-${cls}">${escHtml(text)}</span>`;
+  return `<span class="badge badge-${cls}">${escHtml(labels[text] || text)}</span>`;
 }
 
 // ── Grade Color ───────────────────────────────────────────────
