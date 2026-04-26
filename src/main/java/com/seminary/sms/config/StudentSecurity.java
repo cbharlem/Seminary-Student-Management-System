@@ -43,10 +43,10 @@ public class StudentSecurity {
 
     public boolean isOwner(Authentication auth, String studentId) {
         if (auth == null || studentId == null) return false;
-        // Registrar can always access
-        boolean isRegistrar = auth.getAuthorities().stream()
-            .anyMatch(a -> a.getAuthority().equals("ROLE_Registrar"));
-        if (isRegistrar) return true;
+        // Admin and Registrar can always access any student record
+        boolean isAdminOrRegistrar = auth.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_Admin") || a.getAuthority().equals("ROLE_Registrar"));
+        if (isAdminOrRegistrar) return true;
         // Student can only access their own record
         return userRepository.findByUsername(auth.getName())
             .flatMap(u -> studentRepository.findByUser_UserId(u.getUserId()))

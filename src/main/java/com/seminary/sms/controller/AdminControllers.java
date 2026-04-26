@@ -42,7 +42,9 @@ package com.seminary.sms.controller;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import com.seminary.sms.service.AlumniService;
+import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -67,7 +69,7 @@ class CurriculumController {
     // LAYER 2 → LAYER 4: Calls programRepository.findByIsActiveTrue() — no service needed here
     // LAYER 2 → LAYER 1: Returns a JSON list of active Program objects
     @GetMapping("/programs")
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Program> getPrograms() {
         return programRepository.findByIsActiveTrue();
     }
@@ -76,7 +78,7 @@ class CurriculumController {
     // LAYER 2 → LAYER 4: Calls courseRepository filtered by program and active status
     // LAYER 2 → LAYER 1: Returns a JSON list of Course objects matching the filter
     @GetMapping("/courses")
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Course> getCourses(@RequestParam(required = false) String program) {
         if (program != null) return courseRepository.findByProgram_ProgramIdAndIsActiveTrue(program);
         return courseRepository.findByIsActiveTrue();
@@ -86,7 +88,7 @@ class CurriculumController {
     // LAYER 2 → LAYER 4: Calls prerequisiteRepository.findByCourse_CourseId()
     // LAYER 2 → LAYER 1: Returns a JSON list of Prerequisite rules for the given course
     @GetMapping("/courses/{id}/prerequisites")
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Prerequisite> getPrerequisites(@PathVariable String id) {
         return prerequisiteRepository.findByCourse_CourseId(id);
     }
@@ -178,7 +180,7 @@ class SectionController {
     // LAYER 2 → LAYER 4: Calls sectionRepository filtered by semester if provided; filters to active only
     // LAYER 2 → LAYER 1: Returns a JSON list of active Section objects
     @GetMapping
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Section> getSections(@RequestParam(required = false) String semester) {
         if (semester != null) return sectionRepository.findBySemester_SemesterId(semester)
             .stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
@@ -235,7 +237,7 @@ class SectionController {
     // LAYER 2 → LAYER 4: Returns only active instructors from InstructorRepository
     // LAYER 2 → LAYER 1: Returns a JSON list of active Instructor objects
     @GetMapping("/instructors")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Instructor> getInstructors() {
         return instructorRepository.findByIsActiveTrue();
     }
@@ -272,7 +274,7 @@ class SectionController {
     // LAYER 2 → LAYER 4: Returns only active rooms from RoomRepository
     // LAYER 2 → LAYER 1: Returns a JSON list of active Room objects
     @GetMapping("/rooms")
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Room> getRooms() {
         return roomRepository.findByIsActiveTrue();
     }
@@ -307,12 +309,13 @@ class AlumniController {
 
     private final AlumniRepository alumniRepository;
     private final AlumniService alumniService;
+    private final AuditService auditService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadAlumni() when the alumni page is opened
     // LAYER 2 → LAYER 3: Delegates to alumniService.getAll() which fetches from AlumniRepository
     // LAYER 2 → LAYER 1: Returns a JSON list of all Alumni records
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Alumni> getAll() {
         return alumniService.getAll();
     }
@@ -327,7 +330,9 @@ class AlumniController {
         try {
             LocalDate gradDate = LocalDate.parse(body.get("graduationDate"));
             String honors = body.get("honors");
-            return ResponseEntity.ok(alumniService.graduateStudent(studentId, gradDate, honors));
+            Alumni alum = alumniService.graduateStudent(studentId, gradDate, honors);
+            auditService.log("CREATE", "Alumni", "Graduated student " + studentId + (honors != null && !honors.isBlank() ? " with honors: " + honors : ""));
+            return ResponseEntity.ok(alum);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -370,12 +375,13 @@ class UserController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadUsers() when the registrar opens the Users page
     // LAYER 2 → LAYER 4: Calls userRepository.findAll() to retrieve all accounts
     // LAYER 2 → LAYER 1: Returns a JSON list of User objects (passwordHash is @JsonIgnore so it never appears)
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public List<User> getAll() {
         return userRepository.findAll();
     }
@@ -384,7 +390,7 @@ class UserController {
     // LAYER 2 → LAYER 4: Validates uniqueness, hashes the password via BCrypt, then saves via userRepository
     // LAYER 2 → LAYER 1: Returns the saved User JSON, or 400 if the username already exists or role is invalid
     @PostMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<?> create(@RequestBody Map<String, String> body) {
         if (userRepository.existsByUsername(body.get("username"))) {
             return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
@@ -398,7 +404,9 @@ class UserController {
                 .role(User.Role.valueOf(body.get("role")))
                 .isActive(true)
                 .build();
-            return ResponseEntity.ok(userRepository.save(user));
+            User saved = userRepository.save(user);
+            auditService.log("CREATE", "User", "Created user account: " + saved.getUsername() + " (role: " + saved.getRole() + ")");
+            return ResponseEntity.ok(saved);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid role specified."));
         } catch (Exception e) {
@@ -410,13 +418,14 @@ class UserController {
     // LAYER 2 → LAYER 4: Finds the user by userId, flips the isActive flag, then saves
     // LAYER 2 → LAYER 1: Returns a JSON with the new isActive value
     @PatchMapping("/{userId}/toggle")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<?> toggle(@PathVariable String userId) {
         // SECURITY (A01): Use business key (userId) instead of sequential integer to prevent IDOR
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
+        auditService.log("UPDATE", "User", (user.getIsActive() ? "Enabled" : "Disabled") + " user account: " + user.getUsername());
         return ResponseEntity.ok(Map.of("isActive", user.getIsActive()));
     }
 
@@ -426,7 +435,7 @@ class UserController {
     // SECURITY (A07): Registrars generate a random temp password — they cannot choose one.
     // This prevents registrars from knowing a student's actual password.
     @PatchMapping("/{userId}/generate-temp-password")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<?> generateTempPassword(@PathVariable String userId) {
         // SECURITY (A01): Use business key (userId) instead of sequential integer to prevent IDOR
         User user = userRepository.findByUserId(userId)
@@ -434,6 +443,7 @@ class UserController {
         String tempPassword = generateTemporaryPassword();
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         userRepository.save(user);
+        auditService.log("UPDATE", "User", "Reset password for user: " + user.getUsername());
         return ResponseEntity.ok(Map.of("temporaryPassword", tempPassword,
             "message", "Temporary password generated. Give this to the user — it will not be shown again."));
     }
@@ -463,7 +473,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 4: Calls schoolYearRepository.findAll() to list all school years
     // LAYER 2 → LAYER 1: Returns a JSON list of SchoolYear objects
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<SchoolYear> getAll() {
         return schoolYearRepository.findAll();
     }
@@ -472,7 +482,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 4: Calls schoolYearRepository.save() directly
     // LAYER 2 → LAYER 1: Returns the saved SchoolYear JSON
     @PostMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<SchoolYear> create(@RequestBody SchoolYear sy) {
         return ResponseEntity.ok(schoolYearRepository.save(sy));
     }
@@ -481,7 +491,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 4: Calls semesterRepository.findAll() to list all semesters
     // LAYER 2 → LAYER 1: Returns a JSON list of all Semester objects
     @GetMapping("/semesters")
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Semester> getSemesters() {
         return semesterRepository.findAll();
     }
@@ -490,7 +500,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 4: Calls semesterRepository.findByIsActiveTrue() to find the one active semester
     // LAYER 2 → LAYER 1: Returns the active Semester JSON (200), or 404 if none is active
     @GetMapping("/semesters/active")
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public ResponseEntity<Semester> getActiveSemester() {
         return semesterRepository.findByIsActiveTrue()
             .map(ResponseEntity::ok)
@@ -501,7 +511,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 4: Deactivates ALL semesters first, then activates the selected one
     // LAYER 2 → LAYER 1: Returns the newly activated Semester JSON
     @PatchMapping("/semesters/{id}/activate")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<Semester> activateSemester(@PathVariable String id) {
         // Deactivate all first
         semesterRepository.findAll().forEach(s -> {
@@ -518,7 +528,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 4: Calls semesterRepository.save() directly
     // LAYER 2 → LAYER 1: Returns the saved Semester JSON
     @PostMapping("/semesters")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<Semester> createSemester(@RequestBody Semester semester) {
         return ResponseEntity.ok(semesterRepository.save(semester));
     }
@@ -560,7 +570,7 @@ class DocumentController {
     // LAYER 2 → LAYER 4: Calls documentRepository.findByStudent_StudentId() — no service needed
     // LAYER 2 → LAYER 1: Returns a JSON list of Document records for the student
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #studentId)")
+    @PreAuthorize("hasAnyRole('Registrar','Admin') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Document> getByStudent(@PathVariable String studentId) {
         return documentRepository.findByStudent_StudentId(studentId);
     }
@@ -573,5 +583,31 @@ class DocumentController {
     public ResponseEntity<?> delete(@PathVariable Integer id) {
         documentRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "Document deleted"));
+    }
+}
+
+// ── Audit Log (Admin only) ────────────────────────────────────────────────────
+@RestController
+@RequestMapping("/api/admin")
+@RequiredArgsConstructor
+class AdminAuditController {
+
+    private final com.seminary.sms.repository.AuditLogRepository auditLogRepository;
+
+    // LAYER 1 → LAYER 2: Triggered by app.js loadAuditLog() when the Admin opens the Audit Logs page
+    // LAYER 2 → LAYER 4: Calls auditLogRepository with pagination — newest entries first
+    // LAYER 2 → LAYER 1: Returns a JSON map with items array and total count
+    @GetMapping("/audit-logs")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<Map<String, Object>> getAuditLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        var result = auditLogRepository.findAllByOrderByTimestampDesc(PageRequest.of(page, Math.min(size, 100)));
+        return ResponseEntity.ok(Map.of(
+            "items", result.getContent(),
+            "totalItems", result.getTotalElements(),
+            "totalPages", result.getTotalPages(),
+            "currentPage", page
+        ));
     }
 }

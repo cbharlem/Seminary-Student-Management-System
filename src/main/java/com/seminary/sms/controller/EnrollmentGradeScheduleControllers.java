@@ -29,6 +29,7 @@ package com.seminary.sms.controller;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import com.seminary.sms.service.*;
+import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,12 +55,17 @@ class EnrollmentController {
     private final SemesterRepository semesterRepository;
     private final SectionRepository sectionRepository;
     private final CourseRepository courseRepository;
+    private final AuditService auditService;
+    private final ApplicantRepository applicantRepository;
+    private final ApplicationRepository applicationRepository;
+    private final StudentService studentService;
+    private final EmailService emailService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadEnrollment() to populate the enrollment table
     // LAYER 2 → LAYER 3: Delegates to enrollmentService.getBySemester() if a semester filter is provided
     // LAYER 2 → LAYER 1: Returns a JSON list of Enrollment records matching the filter
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Enrollment> getAll(@RequestParam(required = false) String semester) {
         if (semester != null) return enrollmentService.getBySemester(semester);
         return enrollmentRepository.findAll();
@@ -69,31 +75,133 @@ class EnrollmentController {
     // LAYER 2 → LAYER 3: Delegates to enrollmentService.getEnrollmentsByStudent()
     // LAYER 2 → LAYER 1: Returns a JSON list of all enrollments for this student across all semesters
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #studentId)")
+    @PreAuthorize("hasAnyRole('Registrar','Admin') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Enrollment> getByStudent(@PathVariable String studentId) {
         return enrollmentService.getEnrollmentsByStudent(studentId);
     }
 
-    // LAYER 1 → LAYER 2: Triggered by app.js saveEnrollment() when the registrar enrolls a student
-    // LAYER 2 → LAYER 3: Resolves all references (student, program, semester, section) then delegates to enrollmentService.enroll()
-    // LAYER 2 → LAYER 1: Returns the new Enrollment JSON, or 400 if already enrolled or year level is out of range
+    // Returns all admitted applicants who have not yet been enrolled (no student record yet)
+    @GetMapping("/admitted-applicants")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> getAdmittedApplicants() {
+        List<Application> admitted = applicationRepository
+            .findByApplicationStatus(Application.ApplicationStatus.Admitted);
+        List<Map<String, Object>> result = admitted.stream()
+            .filter(app -> !studentRepository.existsByApplication_ApplicationId(app.getApplicationId()))
+            .map(app -> {
+                Applicant a = app.getApplicant();
+                return Map.<String, Object>of(
+                    "applicantId", a.getApplicantId(),
+                    "applicationId", app.getApplicationId(),
+                    "name", a.getFirstName() + " " + a.getLastName(),
+                    "email", a.getEmail() != null ? a.getEmail() : "",
+                    "programId", a.getAppliedProgram() != null ? a.getAppliedProgram().getProgramId() : "",
+                    "programName", a.getAppliedProgram() != null ? a.getAppliedProgram().getProgramName() : ""
+                );
+            }).toList();
+        return ResponseEntity.ok(result);
+    }
+
+    // LAYER 1 → LAYER 2: Triggered by app.js saveEnrollment() when the registrar enrolls a student.
+    // Accepts either studentId (re-enrollment) or applicantId (first-time enrollment from admitted applicant).
+    // First-time enrollment creates the student record + user account, sends credentials email, then enrolls.
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> enroll(@RequestBody Map<String, String> body) {
         try {
-            Student student = studentRepository.findByStudentId(body.get("studentId"))
-                .orElseThrow(() -> new RuntimeException("Student not found"));
             Program program = programRepository.findByProgramId(body.get("programId"))
                 .orElseThrow(() -> new RuntimeException("Program not found"));
             Semester semester = semesterRepository.findBySemesterId(body.get("semesterId"))
                 .orElseThrow(() -> new RuntimeException("Semester not found"));
-            Section section = body.containsKey("sectionId")
+            Section section = body.containsKey("sectionId") && body.get("sectionId") != null && !body.get("sectionId").isBlank()
                 ? sectionRepository.findBySectionId(body.get("sectionId")).orElse(null) : null;
             // SECURITY (A07): Validate yearLevel bounds to prevent corrupt data
             int yearLevel = Integer.parseInt(body.getOrDefault("yearLevel", "1"));
             if (yearLevel < 1 || yearLevel > 10)
                 throw new RuntimeException("Year level must be between 1 and 10.");
-            return ResponseEntity.ok(enrollmentService.enroll(student, program, semester, section, yearLevel));
+
+            // ── First-time enrollment from admitted applicant ──────────────────
+            if (body.containsKey("applicantId") && body.get("applicantId") != null && !body.get("applicantId").isBlank()) {
+                String applicantId = body.get("applicantId");
+                Applicant applicant = applicantRepository.findByApplicantId(applicantId)
+                    .orElseThrow(() -> new RuntimeException("Applicant not found"));
+                Application application = applicationRepository.findByApplicant_ApplicantId(applicantId)
+                    .orElseThrow(() -> new RuntimeException("Application not found"));
+
+                if (application.getApplicationStatus() != Application.ApplicationStatus.Admitted) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Applicant must be in Admitted status before enrolling."));
+                }
+                if (studentRepository.existsByApplication_ApplicationId(application.getApplicationId())) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "A student record already exists for this applicant."));
+                }
+
+                // Generate student ID
+                String year = String.valueOf(java.time.LocalDate.now().getYear());
+                String studentId = "S" + year + "-" + String.format("%03d", 1 + studentRepository.count());
+
+                // Build student record from applicant data
+                Student student = Student.builder()
+                    .studentId(studentId)
+                    .application(application)
+                    .firstName(applicant.getFirstName())
+                    .middleName(applicant.getMiddleName())
+                    .lastName(applicant.getLastName())
+                    .dateOfBirth(applicant.getDateOfBirth())
+                    .email(applicant.getEmail())
+                    .contactNumber(applicant.getContactNumber())
+                    .address(applicant.getAddress())
+                    .nationality(applicant.getNationality())
+                    .religion(applicant.getReligion())
+                    .fatherName(applicant.getFatherName())
+                    .fatherOccupation(applicant.getFatherOccupation())
+                    .motherName(applicant.getMotherName())
+                    .motherOccupation(applicant.getMotherOccupation())
+                    .guardianName(applicant.getGuardianName())
+                    .guardianContact(applicant.getGuardianContact())
+                    .seminaryLevel(applicant.getSeminaryLevel() != null
+                        ? Student.SeminaryLevel.valueOf(applicant.getSeminaryLevel().name())
+                        : Student.SeminaryLevel.College)
+                    .currentYearLevel(yearLevel)
+                    .program(program)
+                    .currentStatus(Student.StudentStatus.Active)
+                    .build();
+
+                // Create student record + user account
+                String tempPassword = studentService.createWithAccount(student, studentId);
+
+                // Mark application as Enrolled
+                application.setApplicationStatus(Application.ApplicationStatus.Enrolled);
+                applicationRepository.save(application);
+
+                // Send credentials email asynchronously (fire-and-forget — does not block response)
+                boolean emailSent = applicant.getEmail() != null && !applicant.getEmail().isBlank();
+                if (emailSent) {
+                    emailService.sendCredentials(
+                        applicant.getEmail(), studentId, tempPassword,
+                        applicant.getFirstName() + " " + applicant.getLastName()
+                    );
+                }
+
+                // Save enrollment
+                Enrollment enrolled = enrollmentService.enroll(student, program, semester, section, yearLevel);
+                auditService.log("CREATE", "Student", "First enrollment: created student " + studentId + " from applicant " + applicantId);
+                auditService.log("CREATE", "Enrollment", "Enrolled student " + studentId + " in semester " + semester.getSemesterId());
+
+                java.util.Map<String, Object> response = new java.util.HashMap<>();
+                response.put("enrollment", enrolled);
+                response.put("studentId", studentId);
+                response.put("temporaryPassword", tempPassword);
+                response.put("emailSent", emailSent);
+                response.put("isFirstEnrollment", true);
+                return ResponseEntity.ok(response);
+            }
+
+            // ── Re-enrollment of existing student ─────────────────────────────
+            Student student = studentRepository.findByStudentId(body.get("studentId"))
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+            Enrollment enrolled = enrollmentService.enroll(student, program, semester, section, yearLevel);
+            auditService.log("CREATE", "Enrollment", "Enrolled student " + student.getStudentId() + " in semester " + semester.getSemesterId());
+            return ResponseEntity.ok(Map.of("enrollment", enrolled, "isFirstEnrollment", false));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -105,7 +213,7 @@ class EnrollmentController {
     // LAYER 2 → LAYER 3: Delegates to enrollmentService.getSubjectsByEnrollment()
     // LAYER 2 → LAYER 1: Returns a JSON list of EnrollmentSubject objects for this enrollment
     @GetMapping("/{enrollmentId}/subjects")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<EnrollmentSubject> getSubjects(@PathVariable String enrollmentId) {
         return enrollmentService.getSubjectsByEnrollment(enrollmentId);
     }
@@ -142,12 +250,13 @@ class GradeController {
     private final GradeRepository gradeRepository;
     private final GradeService gradeService;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadGrades() to populate the grades management table
     // LAYER 2 → LAYER 3: Delegates to gradeService.getGradesBySemester() if filtered, otherwise returns all
     // LAYER 2 → LAYER 1: Returns a JSON list of Grade records
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Grade> getAll(@RequestParam(required = false) String semester) {
         if (semester != null) return gradeService.getGradesBySemester(semester);
         return gradeRepository.findAll();
@@ -157,7 +266,7 @@ class GradeController {
     // LAYER 2 → LAYER 3: Delegates to gradeService filtered by student and optionally by semester
     // LAYER 2 → LAYER 1: Returns a JSON list of Grade records for the specified student
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #studentId)")
+    @PreAuthorize("hasAnyRole('Registrar','Admin') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Grade> getByStudent(@PathVariable String studentId,
                                      @RequestParam(required = false) String semester) {
         if (semester != null) return gradeService.getGradesByStudentAndSemester(studentId, semester);
@@ -174,7 +283,9 @@ class GradeController {
         try {
             User user = userRepository.findByUsername(auth.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-            return ResponseEntity.ok(gradeService.saveGrade(grade, user));
+            Grade saved = gradeService.saveGrade(grade, user);
+            auditService.log("CREATE", "Grade", "Created grade record ID: " + saved.getGradeId());
+            return ResponseEntity.ok(saved);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -208,7 +319,9 @@ class GradeController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Grade status is required."));
             Grade.GradeStatus status = Grade.GradeStatus.valueOf(body.get("gradeStatus").toString());
             String remarks = body.get("remarks") != null ? body.get("remarks").toString() : null;
-            return ResponseEntity.ok(gradeService.updateGrade(id, mtCS, mtExam, fnCS, fnExam, status, remarks, user));
+            Grade updated = gradeService.updateGrade(id, mtCS, mtExam, fnCS, fnExam, status, remarks, user);
+            auditService.log("UPDATE", "Grade", "Updated grade record ID: " + id);
+            return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
             // SECURITY (A08): Enum poisoning — return generic message not class path
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid grade status value."));
@@ -237,7 +350,7 @@ class ScheduleController {
     // LAYER 2 → LAYER 3: Delegates to scheduleService.getBySection() if filtered, otherwise returns all
     // LAYER 2 → LAYER 1: Returns a JSON list of Schedule objects
     @GetMapping
-    @PreAuthorize("hasAnyRole('Registrar','Student')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Schedule> getAll(@RequestParam(required = false) String section) {
         if (section != null) return scheduleService.getBySection(section);
         return scheduleRepository.findAll();

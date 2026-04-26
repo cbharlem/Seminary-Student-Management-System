@@ -3,6 +3,7 @@ package com.seminary.sms.controller;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import com.seminary.sms.service.*;
+import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,7 +39,7 @@ class StudentController {
 
     // LAYER 1 → LAYER 2: Receives GET /api/students from app.js loadStudents()
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public ResponseEntity<?> getAll(@RequestParam(required = false) String q,
                                      @RequestParam(required = false) String program,
                                      @RequestParam(required = false) String status) {
@@ -67,7 +68,7 @@ class StudentController {
     // LAYER 4 → LAYER 2 → LAYER 1: Repository returns Optional<Student>, Controller
     //   unwraps it — if found returns 200 + student JSON, if not found returns 404
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('Registrar') or @studentSecurity.isOwner(authentication, #id)")
+    @PreAuthorize("hasAnyRole('Registrar','Admin') or @studentSecurity.isOwner(authentication, #id)")
     public ResponseEntity<Student> getById(@PathVariable String id) {
         return studentRepository.findByStudentId(id)
             .map(ResponseEntity::ok)
@@ -139,12 +140,13 @@ class ApplicantController {
     private final SchoolYearRepository schoolYearRepository;
     private final StudentRepository studentRepository;
     private final StudentService studentService;
+    private final AuditService auditService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadApplicants() when the registrar opens the Applicants page
     // LAYER 2 → LAYER 4: Fetches all applicants from the repository, then builds a status map from applications
     // LAYER 2 → LAYER 1: Returns a JSON list of applicants with their application status attached
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Applicant> getAll() {
         // SECURITY (A05): Cap unfiltered results to prevent large query DoS
         List<Applicant> applicants = applicantRepository.findAll(PageRequest.of(0, 500)).getContent();
@@ -163,7 +165,7 @@ class ApplicantController {
     // LAYER 2 → LAYER 4: Calls applicantRepository.findByApplicantId() to look up the specific record
     // LAYER 2 → LAYER 1: Returns the Applicant JSON (200), or 404 if not found
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public ResponseEntity<Applicant> getById(@PathVariable String id) {
         return applicantRepository.findByApplicantId(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
@@ -240,7 +242,7 @@ class ApplicantController {
     // LAYER 2 → LAYER 3: Delegates to applicantService.getApplicationByApplicant()
     // LAYER 2 → LAYER 1: Returns the Application JSON (200), or 404 if no application exists yet
     @GetMapping("/{id}/application")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public ResponseEntity<Application> getApplication(@PathVariable String id) {
         return applicantService.getApplicationByApplicant(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
@@ -263,7 +265,7 @@ class ApplicantController {
     // LAYER 2 → LAYER 3: Delegates to applicantService.getExamsByApplicant()
     // LAYER 2 → LAYER 1: Returns a JSON list of EntranceExam records for this applicant
     @GetMapping("/{id}/exams")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<EntranceExam> getExams(@PathVariable String id) {
         return applicantService.getExamsByApplicant(id);
     }
@@ -283,19 +285,15 @@ class ApplicantController {
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js confirmAdmit() when the registrar admits a confirmed applicant
-    // LAYER 2 → LAYER 3/4: Validates the applicant, creates a Student record, and calls studentService.createWithAccount()
-    //   to create both the student record and a login account with a temporary password in one transaction
-    // LAYER 2 → LAYER 1: Returns the new studentId and temporaryPassword, which the registrar hands to the student
+    // Only marks the applicant as Admitted. Student record and user account are created at first enrollment.
     @PostMapping("/{id}/admit")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<?> admit(@PathVariable String id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> admit(@PathVariable String id) {
         try {
-            // 1. Find applicant
-            // SECURITY (A08): Removed ID from exception message to prevent information disclosure
             Applicant applicant = applicantRepository.findByApplicantId(id)
                 .orElseThrow(() -> new RuntimeException("Applicant not found"));
 
-            // 2. Find application — create one if missing (for applicants added before auto-create was implemented)
+            // Find or create the application record
             Application application = applicationRepository.findByApplicant_ApplicantId(id)
                 .orElseGet(() -> {
                     SchoolYear activeYear2 = schoolYearRepository.findByIsActiveTrue()
@@ -311,91 +309,17 @@ class ApplicantController {
                     return applicationRepository.save(newApp);
                 });
 
-            // 3. Prevent duplicate — one applicant can only become one student
-            if (studentRepository.existsByApplication_ApplicationId(application.getApplicationId())) {
-                return ResponseEntity.badRequest().body(Map.of("error", "A student record already exists for this applicant."));
+            // Prevent re-admitting if already admitted or enrolled
+            if (application.getApplicationStatus() == Application.ApplicationStatus.Admitted
+                    || application.getApplicationStatus() == Application.ApplicationStatus.Enrolled) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Applicant is already admitted."));
             }
 
-            // 4. Resolve program — use applicant's applied program; only allow override if it matches
-            String appliedProgramId = applicant.getAppliedProgram() != null
-                ? applicant.getAppliedProgram().getProgramId() : null;
-            String requestedProgramId = body.get("programId") != null ? body.get("programId").toString() : null;
-
-            // SECURITY (A01): Reject if the caller is trying to assign a different program than applied
-            if (requestedProgramId != null && appliedProgramId != null
-                    && !requestedProgramId.equals(appliedProgramId)) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Cannot admit applicant to a program different from their applied program."));
-            }
-
-            // SECURITY (A01): Require at least one program — prevent null program assignment
-            String programId = requestedProgramId != null ? requestedProgramId : appliedProgramId;
-            if (programId == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "A program must be specified for admission."));
-            }
-
-            // SECURITY (A08): Removed program ID from exception message
-            com.seminary.sms.entity.Program program = programRepository.findByProgramId(programId)
-                .orElseThrow(() -> new RuntimeException("Program not found"));
-
-            // 5. Year level — SECURITY (A07): Validate bounds to prevent corrupt data
-            int yearLevel = 1;
-            if (body.get("yearLevel") != null) {
-                try {
-                    yearLevel = Integer.parseInt(body.get("yearLevel").toString());
-                } catch (NumberFormatException e) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Year level must be a number."));
-                }
-            }
-            if (yearLevel < 1 || yearLevel > 10) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Year level must be between 1 and 10."));
-            }
-
-            // 6. Generate student ID
-            String year = String.valueOf(java.time.LocalDate.now().getYear());
-            String studentId = "S" + year + "-" + String.format("%03d", 1 + studentRepository.count());
-
-            // 7. Build student from applicant data
-            com.seminary.sms.entity.Student student = com.seminary.sms.entity.Student.builder()
-                .studentId(studentId)
-                .application(application)
-                .firstName(applicant.getFirstName())
-                .middleName(applicant.getMiddleName())
-                .lastName(applicant.getLastName())
-                .dateOfBirth(applicant.getDateOfBirth())
-                .email(applicant.getEmail())
-                .contactNumber(applicant.getContactNumber())
-                .address(applicant.getAddress())
-                .nationality(applicant.getNationality())
-                .religion(applicant.getReligion())
-                .fatherName(applicant.getFatherName())
-                .fatherOccupation(applicant.getFatherOccupation())
-                .motherName(applicant.getMotherName())
-                .motherOccupation(applicant.getMotherOccupation())
-                .guardianName(applicant.getGuardianName())
-                .guardianContact(applicant.getGuardianContact())
-                .seminaryLevel(applicant.getSeminaryLevel() != null
-                    ? com.seminary.sms.entity.Student.SeminaryLevel.valueOf(applicant.getSeminaryLevel().name())
-                    : com.seminary.sms.entity.Student.SeminaryLevel.College)
-                .currentYearLevel(yearLevel)
-                .program(program)
-                .currentStatus(com.seminary.sms.entity.Student.StudentStatus.Active)
-                .build();
-
-            // 8. Create student record + login account with a random temporary password
-            // SECURITY (A07): Temp password is returned once to the registrar to hand to the student
-            String tempPassword = studentService.createWithAccount(student, studentId);
-
-            // 9. Mark application as Admitted
             application.setApplicationStatus(Application.ApplicationStatus.Admitted);
             applicationRepository.save(application);
 
-            return ResponseEntity.ok(Map.of(
-                "message", "Student admitted successfully",
-                "studentId", studentId,
-                "temporaryPassword", tempPassword,
-                "note", "Give this temporary password to the student. They should change it on first login."
-            ));
+            auditService.log("UPDATE", "Applicant", "Admitted applicant " + id + " — pending first enrollment");
+            return ResponseEntity.ok(Map.of("message", "Applicant admitted successfully. Enroll them to create their student account."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {

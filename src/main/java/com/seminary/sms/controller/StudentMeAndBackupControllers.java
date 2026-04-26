@@ -161,12 +161,12 @@ class BackupController {
      * Returns the full list of past backup log entries.
      */
     @GetMapping("/log")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public List<BackupLog> getLog() {
         return backupLogRepository.findAllByOrderByBackupDateDesc();
     }
 
-    // LAYER 1 → LAYER 2: Triggered by app.js triggerBackup() when the registrar requests a backup
+    // LAYER 1 → LAYER 2: Triggered by app.js triggerBackup() when the admin requests a backup
     // Currently returns a placeholder message — full implementation would use ProcessBuilder + mysqldump
     // LAYER 2 → LAYER 1: Returns an informational message JSON
     /**
@@ -176,7 +176,7 @@ class BackupController {
      * Implement with ProcessBuilder + mysqldump for production use.
      */
     @PostMapping("/create")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<?> createBackup(Authentication auth) {
         // SECURITY (A05): Never expose DB credentials, names, or implementation details in responses
         return ResponseEntity.ok(Map.of("message", "Backup feature is not yet implemented."));

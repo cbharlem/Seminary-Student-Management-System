@@ -74,5 +74,5 @@ public class User {
     @PreUpdate
     protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 
-    public enum Role { Registrar, Student }
+    public enum Role { Admin, Registrar, Student }
 }

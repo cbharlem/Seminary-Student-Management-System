@@ -298,6 +298,7 @@ thead th.sortable.sort-desc::after {
 }
 .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 .btn-danger  { background: var(--danger); color: white; }
+body.admin-view .registrar-only { display: none !important; }
 .btn-success { background: var(--success); color: white; }
 .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
 .btn-view {
@@ -333,6 +334,12 @@ thead th.sortable.sort-desc::after {
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 .tab.active { color: var(--navy); border-color: var(--navy); font-weight: 600; }
+
+/* ── Curriculum nested tabs ───────────────────────────────── */
+.tabs-year { margin-bottom: 0; border-bottom: none; }
+.tabs-sem { margin-bottom: 20px; padding-left: 4px; }
+.tabs-sem .tab { font-size: 0.8rem; padding: 6px 14px; color: var(--gray-400); }
+.tabs-sem .tab.active { color: var(--navy-mid); border-color: var(--navy-mid); }
 
 /* ── Modal ─────────────────────────────────────────────────── */
 .modal-overlay {

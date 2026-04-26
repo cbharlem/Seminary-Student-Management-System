@@ -27,6 +27,9 @@ function toggleSidebar() {
 const sdTabs   = ['sd-personal','sd-family','sd-religious','sd-grades-tab','sd-hist-tab'];
 const stTabs   = ['st-tab-personal','st-tab-family','st-tab-religious','st-tab-academic'];
 const currTabs = ['curr-philo','curr-theo'];
+let _currCourses = {};
+let _currYear    = { 'PRG-1001': 1, 'PRG-1002': 1 };
+let _currSem     = { 'PRG-1001': 1, 'PRG-1002': 1 };
 
 // ── Color Palette for schedule items ─────────────────────────
 const SCHED_COLORS = ['#0d1b5e','#2e4bbd','#2d7d46','#b45309','#1d4ed8','#7c3aed','#0891b2'];
@@ -62,7 +65,7 @@ const pageLoaders = {
   enrollment:     loadEnrollment,
   students:       loadStudents,
   alumni:         loadAlumni,
-  curriculum:     () => { loadCurriculum('PRG-1001','tbl-curr-philo'); },
+  curriculum:     () => { loadCurriculum('PRG-1001'); },
   sections:       loadSections,
   schedule:       loadSchedule,
   grades:         loadGrades,
@@ -71,6 +74,7 @@ const pageLoaders = {
   users:          loadUsers,
   'school-years': loadSchoolYears,
   backup:         loadBackup,
+  'audit-logs':   loadAuditLog,
   'my-grades':    loadMyGrades,
   'my-schedule':  loadMySchedule,
   'my-profile':   loadMyProfile,
@@ -122,7 +126,13 @@ async function init() {
     } catch (_) {}
 
     // Show correct nav
-    if (me.role === 'Registrar') {
+    if (me.role === 'Admin') {
+      document.getElementById('nav-admin').style.display = '';
+      document.getElementById('nav-registrar').style.display = '';
+      document.body.classList.add('admin-view');
+      loadDashboard();
+      document.querySelector('#nav-admin .nav-item').classList.add('active');
+    } else if (me.role === 'Registrar') {
       document.getElementById('nav-registrar').style.display = '';
       loadDashboard();
       document.querySelector('#nav-registrar .nav-item').classList.add('active');
@@ -355,8 +365,8 @@ async function loadAlumni() {
     tbody.innerHTML = data.map(a =>
       `<tr><td>${escHtml(a.alumniId)}</td><td>${escHtml(a.student?.firstName)} ${escHtml(a.student?.lastName)}</td><td>${escHtml(a.program?.programCode)}</td><td>${fmtDate(a.graduationDate)}</td><td>${escHtml(a.honors || '—')}</td><td>${escHtml(a.currentMinistry || '—')}</td>
       <td style="display:flex;gap:6px">
-        <button class="btn btn-outline btn-sm">Edit</button>
-        <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="unmarkAlumni('${escHtml(a.alumniId)}','${escHtml(a.student?.firstName)} ${escHtml(a.student?.lastName)}')">Unmark</button>
+        <button class="btn btn-outline btn-sm registrar-only">Edit</button>
+        <button class="btn btn-outline btn-sm registrar-only" style="color:var(--danger);border-color:var(--danger)" onclick="unmarkAlumni('${escHtml(a.alumniId)}','${escHtml(a.student?.firstName)} ${escHtml(a.student?.lastName)}')">Unmark</button>
       </td></tr>`
     ).join('');
   } catch (e) { console.error(e); }
@@ -381,29 +391,58 @@ async function confirmUnmarkAlumni() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-async function loadCurriculum(programId, tbodyId) {
+async function loadCurriculum(programId) {
   try {
     const data = await api(`/api/curriculum/courses?program=${programId}`);
-    const tbody = document.getElementById(tbodyId);
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No courses found.</p></div></td></tr>'; return; }
     data.forEach(c => { _courseMap[c.courseId] = c; });
-    tbody.innerHTML = data.map(c =>
-      `<tr>
-        <td>${escHtml(c.courseCode)}</td><td>${escHtml(c.courseName)}</td><td>${c.units}</td>
-        <td>${c.yearLevel}</td><td>${c.semesterNumber}${c.semesterNumber==1?'st':'nd'}</td>
-        <td>${c.prerequisites?.length ? c.prerequisites.map(p=>`${badge(p.prerequisiteCourse?.courseCode,'warn')}`).join(' ') : 'None'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-outline btn-sm" onclick="openCourseModal('${escHtml(c.courseId)}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteCourse('${escHtml(c.courseId)}')">Delete</button>
-        </td>
-      </tr>`
-    ).join('');
+    _currCourses[programId] = data;
+    renderCurriculumTable(programId);
   } catch (e) { console.error(e); }
+}
+
+function renderCurriculumTable(programId) {
+  const tbodyId = programId === 'PRG-1001' ? 'tbl-curr-philo' : 'tbl-curr-theo';
+  const tbody = document.getElementById(tbodyId);
+  const year  = _currYear[programId] || 1;
+  const sem   = _currSem[programId]  || 1;
+  const rows  = (_currCourses[programId] || []).filter(c => c.yearLevel === year && c.semesterNumber === sem);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No courses for this semester.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(c =>
+    `<tr>
+      <td>${escHtml(c.courseCode)}</td>
+      <td>${escHtml(c.courseName)}</td>
+      <td>${c.units}</td>
+      <td>${c.prerequisites?.length ? c.prerequisites.map(p => badge(p.prerequisiteCourse?.courseCode,'warn')).join(' ') : 'None'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm registrar-only" onclick="openCourseModal('${escHtml(c.courseId)}')">Edit</button>
+        <button class="btn btn-danger btn-sm registrar-only" onclick="deleteCourse('${escHtml(c.courseId)}')">Delete</button>
+      </td>
+    </tr>`
+  ).join('');
+}
+
+function currYearTab(el, programId, year) {
+  const tabsId = programId === 'PRG-1001' ? 'philo-year-tabs' : 'theo-year-tabs';
+  document.querySelectorAll(`#${tabsId} .tab`).forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  _currYear[programId] = year;
+  renderCurriculumTable(programId);
+}
+
+function currSemTab(el, programId, sem) {
+  const tabsId = programId === 'PRG-1001' ? 'philo-sem-tabs' : 'theo-sem-tabs';
+  document.querySelectorAll(`#${tabsId} .tab`).forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  _currSem[programId] = sem;
+  renderCurriculumTable(programId);
 }
 
 function currTab(el, showId, programId) {
   switchTab(el, showId, currTabs);
-  loadCurriculum(programId, showId==='curr-philo' ? 'tbl-curr-philo' : 'tbl-curr-theo');
+  loadCurriculum(programId);
 }
 
 async function loadSections() {
@@ -417,8 +456,8 @@ async function loadSections() {
         <td>${escHtml(s.program?.programCode)}</td><td>${s.yearLevel}</td>
         <td>${escHtml(s.semester?.semesterLabel || '—')}</td><td>${s.capacity}</td>
         <td style="white-space:nowrap">
-          <button class="btn btn-outline btn-sm" onclick='openSectionModal(${JSON.stringify(s)})'>Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteSection('${escHtml(s.sectionId)}')">Delete</button>
+          <button class="btn btn-outline btn-sm registrar-only" onclick='openSectionModal(${JSON.stringify(s)})'>Edit</button>
+          <button class="btn btn-danger btn-sm registrar-only" onclick="deleteSection('${escHtml(s.sectionId)}')">Delete</button>
         </td>
       </tr>`
     ).join('');
@@ -446,8 +485,8 @@ async function loadSchedule() {
         <td>${escHtml(s.dayOfWeek)}</td>
         <td>${escHtml(s.timeStart)} – ${escHtml(s.timeEnd)}</td>
         <td style="display:flex;gap:6px">
-          <button class="btn btn-outline btn-sm" onclick="openEditSchedModal('${escHtml(s.scheduleId)}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="confirmDeleteSchedule('${escHtml(s.scheduleId)}')">Delete</button>
+          <button class="btn btn-outline btn-sm registrar-only" onclick="openEditSchedModal('${escHtml(s.scheduleId)}')">Edit</button>
+          <button class="btn btn-danger btn-sm registrar-only" onclick="confirmDeleteSchedule('${escHtml(s.scheduleId)}')">Delete</button>
         </td>
       </tr>`
     ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">No schedules yet</td></tr>';
@@ -558,7 +597,7 @@ async function loadGrades() {
         <td class="${gradeClass(g.finalGrade)}">${g.finalGrade || '—'}</td>
         <td class="${gradeClass(g.finalRating)}">${g.finalRating || '—'}</td>
         <td>${badge(g.gradeStatus)}</td>
-        <td><button class="btn btn-outline btn-sm"
+        <td><button class="btn btn-outline btn-sm registrar-only"
           data-grade-id="${g.gradeId}"
           data-student="${escHtml((g.student?.firstName || '') + ' ' + (g.student?.lastName || ''))}"
           data-course="${escHtml(g.course?.courseCode || '')}"
@@ -680,7 +719,7 @@ async function loadInstructors() {
     tbody.innerHTML = data.map(i =>
       `<tr><td>${escHtml(i.instructorId)}</td><td>${escHtml(i.firstName)} ${escHtml(i.lastName)}</td><td>${escHtml(i.email || '—')}</td><td>${escHtml(i.specialization || '—')}</td>
       <td>${badge(i.isActive ? 'Active' : 'Inactive', i.isActive ? 'success' : 'gray')}</td>
-      <td><button class="btn btn-outline btn-sm" onclick="editInstructor('${escHtml(i.instructorId)}')">Edit</button></td></tr>`
+      <td><button class="btn btn-outline btn-sm registrar-only" onclick="editInstructor('${escHtml(i.instructorId)}')">Edit</button></td></tr>`
     ).join('');
   } catch (e) { console.error(e); }
 }
@@ -739,6 +778,43 @@ async function loadBackup() {
       `<tr><td>${fmtDate(b.backupDate)}</td><td>${b.backupType}</td><td>${b.performedBy?.username || '—'}</td><td>${b.notes || '—'}</td></tr>`
     ).join('');
   } catch (_) {}
+}
+
+// ── ADMIN PAGE LOADERS ────────────────────────────────────────
+
+let _auditPage = 0;
+
+async function loadAuditLog(page) {
+  _auditPage = (page !== undefined) ? page : 0;
+  try {
+    const data = await api(`/api/admin/audit-logs?page=${_auditPage}&size=50`);
+    const tbody = document.getElementById('tbl-audit-log');
+    if (!tbody) return;
+    const actionColors = { CREATE: '#2d7d46', UPDATE: '#b45309', DELETE: '#c0392b', LOGIN: '#1d4ed8', LOGIN_FAILED: '#7c3aed' };
+    tbody.innerHTML = (data.items || []).map(e => {
+      const color = actionColors[e.action] || '#374151';
+      return `<tr>
+        <td style="white-space:nowrap;font-size:.8rem">${fmtDate(e.timestamp)}</td>
+        <td>${escHtml(e.performedBy)}</td>
+        <td><span class="badge">${escHtml(e.role)}</span></td>
+        <td><span style="font-weight:600;color:${color}">${escHtml(e.action)}</span></td>
+        <td>${escHtml(e.entityType)}</td>
+        <td style="max-width:300px;font-size:.82rem">${escHtml(e.detail || '—')}</td>
+        <td style="font-size:.8rem;color:var(--gray-400)">${escHtml(e.ipAddress || '—')}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:20px">No audit log entries yet.</td></tr>';
+
+    const pag = document.getElementById('audit-log-pagination');
+    if (pag && data.totalPages > 1) {
+      const totalPages = data.totalPages;
+      let html = `<span>Page ${_auditPage + 1} of ${totalPages} &nbsp;|&nbsp; ${data.totalItems} total entries</span>&nbsp;`;
+      if (_auditPage > 0) html += `<button class="btn btn-outline btn-sm" onclick="loadAuditLog(${_auditPage - 1})">← Prev</button> `;
+      if (_auditPage < totalPages - 1) html += `<button class="btn btn-outline btn-sm" onclick="loadAuditLog(${_auditPage + 1})">Next →</button>`;
+      pag.innerHTML = html;
+    } else if (pag) {
+      pag.innerHTML = data.totalItems ? `<span>${data.totalItems} entries</span>` : '';
+    }
+  } catch (e) { console.error(e); }
 }
 
 // ── STUDENT PAGE LOADERS ───────────────────────────────────────
@@ -1102,50 +1178,125 @@ function closeEnrStudentDropdown() {
   document.getElementById('enr-student-list').classList.remove('open');
 }
 
+let _enrollTab = 'applicant';
+
+function switchEnrollTab(tab) {
+  _enrollTab = tab;
+  document.getElementById('enr-panel-applicant').style.display = tab === 'applicant' ? '' : 'none';
+  document.getElementById('enr-panel-student').style.display   = tab === 'student'   ? '' : 'none';
+  document.getElementById('enr-tab-applicant').style.background = tab === 'applicant' ? 'var(--navy)' : 'white';
+  document.getElementById('enr-tab-applicant').style.color      = tab === 'applicant' ? 'white' : 'var(--gray-600)';
+  document.getElementById('enr-tab-student').style.background  = tab === 'student'   ? 'var(--navy)' : 'white';
+  document.getElementById('enr-tab-student').style.color       = tab === 'student'   ? 'white' : 'var(--gray-600)';
+}
+
 async function openEnrollModal() {
-  // Reset student search
+  _enrollTab = 'applicant';
+  switchEnrollTab('applicant');
+
+  // Reset fields
   const searchEl = document.getElementById('enr-student-search');
   const hiddenEl = document.getElementById('enr-student');
   if (searchEl) searchEl.value = '';
   if (hiddenEl) hiddenEl.value = '';
   _enrStudents = [];
 
-  // Populate selects
+  // Load admitted applicants
+  try {
+    const applicants = await api('/api/enrollment/admitted-applicants');
+    const sel = document.getElementById('enr-applicant');
+    sel.innerHTML = '<option value="">Select admitted applicant…</option>';
+    applicants.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.applicantId;
+      opt.textContent = `${a.name} — ${a.programName}`;
+      opt.dataset.programId = a.programId;
+      sel.appendChild(opt);
+    });
+    if (applicants.length === 0) {
+      sel.innerHTML = '<option value="">No admitted applicants pending enrollment</option>';
+    }
+  } catch (_) {}
+
+  // Load existing students
   try {
     const students = await api('/api/students?status=Active');
     _enrStudents = students;
     renderEnrStudentOptions('');
   } catch (_) {}
+
+  // Shared: semesters and sections
   try {
     const sems = await api('/api/school-years/semesters');
     populateSelect('enr-semester', sems, 'semesterId', s => s.semesterLabel, '');
-    if (SMS.activeSemester) document.getElementById('enr-semester').value = SMS.activeSemester.semesterId;
+    populateSelect('enr-app-semester', sems, 'semesterId', s => s.semesterLabel, '');
+    if (SMS.activeSemester) {
+      document.getElementById('enr-semester').value     = SMS.activeSemester.semesterId;
+      document.getElementById('enr-app-semester').value = SMS.activeSemester.semesterId;
+    }
   } catch (_) {}
   try {
     const sections = await api('/api/sections');
-    populateSelect('enr-section', sections, 'sectionId', s => s.sectionName, 'No section');
+    populateSelect('enr-section',     sections, 'sectionId', s => s.sectionName, 'No section');
+    populateSelect('enr-app-section', sections, 'sectionId', s => s.sectionName, 'No section');
   } catch (_) {}
+
   openModal('modal-enroll');
 }
 
 async function saveEnrollment() {
-  if (!validateRequired([
-    {id:'enr-student',  label:'Student'},
-    {id:'enr-program',  label:'Program'},
-    {id:'enr-semester', label:'Semester'},
-    {id:'enr-year',     label:'Year Level'},
-  ])) return;
+  if (_enrollTab === 'applicant') {
+    const applicantId = document.getElementById('enr-applicant').value;
+    if (!applicantId) { toast('Please select an admitted applicant', 'error'); return; }
+    if (!validateRequired([
+      {id:'enr-app-program',  label:'Program'},
+      {id:'enr-app-semester', label:'Semester'},
+      {id:'enr-app-year',     label:'Year Level'},
+    ])) return;
+  } else {
+    if (!validateRequired([
+      {id:'enr-student',  label:'Student'},
+      {id:'enr-program',  label:'Program'},
+      {id:'enr-semester', label:'Semester'},
+      {id:'enr-year',     label:'Year Level'},
+    ])) return;
+  }
+  const btn = document.getElementById('btn-confirm-enroll');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enrolling…'; }
+  await new Promise(r => requestAnimationFrame(r));
   try {
-    await api('/api/enrollment', 'POST', {
-      studentId:  document.getElementById('enr-student').value,
-      programId:  document.getElementById('enr-program').value,
-      yearLevel:  parseInt(document.getElementById('enr-year').value),
-      sectionId:  document.getElementById('enr-section').value || null,
-      semesterId: document.getElementById('enr-semester').value,
-    });
-    toast('Student enrolled successfully');
-    closeModal('modal-enroll'); loadEnrollment();
+    if (_enrollTab === 'applicant') {
+      const applicantId = document.getElementById('enr-applicant').value;
+      const result = await api('/api/enrollment', 'POST', {
+        applicantId,
+        programId:  document.getElementById('enr-app-program').value,
+        yearLevel:  parseInt(document.getElementById('enr-app-year').value),
+        sectionId:  document.getElementById('enr-app-section').value || null,
+        semesterId: document.getElementById('enr-app-semester').value,
+      });
+      closeModal('modal-enroll');
+      // Show credentials — only available now
+      document.getElementById('cred-username').textContent = result.studentId;
+      document.getElementById('cred-password').textContent = result.temporaryPassword;
+      const emailNote = document.getElementById('cred-email-note');
+      if (emailNote) emailNote.textContent = result.emailSent
+        ? 'Credentials have also been sent to the student\'s email.'
+        : 'No email was sent — email address not on file. Give these credentials to the student directly.';
+      openModal('modal-credentials');
+      loadEnrollment();
+    } else {
+      await api('/api/enrollment', 'POST', {
+        studentId:  document.getElementById('enr-student').value,
+        programId:  document.getElementById('enr-program').value,
+        yearLevel:  parseInt(document.getElementById('enr-year').value),
+        sectionId:  document.getElementById('enr-section').value || null,
+        semesterId: document.getElementById('enr-semester').value,
+      });
+      toast('Student enrolled successfully');
+      closeModal('modal-enroll'); loadEnrollment();
+    }
   } catch (e) { toast(e.message, 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Confirm Enrollment'; } }
 }
 
 function editGrade(id, student, course, mtCS, mtExam, fnCS, fnExam, mtGrade, fnGrade, status, remarks) {
@@ -1266,7 +1417,7 @@ async function saveCourse() {
       toast('Course added');
     }
     closeModal('modal-course');
-    loadCurriculum(programId, programId === 'PRG-1001' ? 'tbl-curr-philo' : 'tbl-curr-theo');
+    loadCurriculum(programId);
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1281,8 +1432,8 @@ async function confirmDeleteCourse() {
     await api(`/api/curriculum/courses/${id}`, 'DELETE');
     toast('Course deleted');
     closeModal('modal-course-delete');
-    loadCurriculum('PRG-1001', 'tbl-curr-philo');
-    loadCurriculum('PRG-1002', 'tbl-curr-theo');
+    loadCurriculum('PRG-1001');
+    loadCurriculum('PRG-1002');
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1704,23 +1855,16 @@ async function viewApplicantDetail(id) {
 
 function openAdmitModal() {
   const name = document.getElementById('apd-title').textContent;
-  const program = document.getElementById('apd-program').value;
-  document.getElementById('admit-sub').textContent = `Admitting ${name} as a new student`;
-  document.getElementById('admit-program').value = program;
+  document.getElementById('admit-sub').textContent = `Admitting: ${name}`;
   openModal('modal-admit');
 }
 
 async function confirmAdmit() {
-  const yearLevel = document.getElementById('admit-year-level').value;
-  const programId = document.getElementById('admit-program').value;
   try {
-    const result = await api(`/api/applicants/${_currentApplicantId}/admit`, 'POST', { yearLevel, programId });
+    await api(`/api/applicants/${_currentApplicantId}/admit`, 'POST');
     closeModal('modal-admit');
     closeModal('modal-applicant-detail');
-    // Show credentials modal — temp password is only available at this moment
-    document.getElementById('cred-username').textContent  = result.studentId;
-    document.getElementById('cred-password').textContent  = result.temporaryPassword;
-    openModal('modal-credentials');
+    toast('Applicant admitted. Go to Enrollment to enroll them and create their account.');
     loadApplicants();
   } catch (e) { toast(e.message, 'error'); }
 }

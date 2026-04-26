@@ -18,6 +18,7 @@ logs/
 # Environment / secrets
 .env
 *.env
+src/main/resources/application.properties
 
 # Uploads (user-generated files, not source code)
 uploads/

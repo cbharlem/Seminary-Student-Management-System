@@ -53,7 +53,7 @@ public class DashboardController {
     //   and to fetch recent enrollments and the active semester's program breakdown
     // LAYER 2 → LAYER 1: Returns a single JSON map containing all stats the dashboard card tiles display
     @GetMapping("/dashboard/stats")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public ResponseEntity<Map<String, Object>> getStats() {
         Map<String, Object> stats = new HashMap<>();
 

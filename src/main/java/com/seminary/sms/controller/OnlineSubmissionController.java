@@ -179,7 +179,7 @@ class RegistrarSubmissionsController {
      * LAYER 1 → LAYER 2: Called by app.js loadSubmissions() on page load and tab switch.
      */
     @GetMapping
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public ResponseEntity<List<OnlineSubmission>> getAll(
             @RequestParam(required = false) String status) {
         if (status != null && !status.isBlank()) {
@@ -199,7 +199,7 @@ class RegistrarSubmissionsController {
      * LAYER 1 → LAYER 2: Called by app.js openSubmissionDetail().
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('Registrar')")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public ResponseEntity<OnlineSubmission> getById(@PathVariable String id) {
         return submissionRepository.findBySubmissionId(id)
             .map(ResponseEntity::ok)
