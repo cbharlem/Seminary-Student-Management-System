@@ -137,17 +137,20 @@ public class EnrollmentService {
 
     // LAYER 2 → LAYER 3: Called by EnrollmentController.enrollSubject() to add one subject to an enrollment
     // LAYER 3 → LAYER 4: Fetches the full Course from DB, runs checkPrerequisites(), then saves an EnrollmentSubject
-    // Throws a RuntimeException if any prerequisite course has not been passed yet
+    // When override=true, the prerequisite check is skipped and overrideReason is recorded on the record (Option B).
     @Transactional
-    public EnrollmentSubject enrollSubject(Enrollment enrollment, Course courseRef, Schedule schedule) {
+    public EnrollmentSubject enrollSubject(Enrollment enrollment, Course courseRef, Schedule schedule,
+                                           boolean override, String overrideReason) {
         // Fetch full course from DB
         Course course = courseRepository.findByCourseId(courseRef.getCourseId())
             .orElseThrow(() -> new RuntimeException("Course not found: " + courseRef.getCourseId()));
 
-        // Check prerequisites
-        List<String> unmet = checkPrerequisites(enrollment.getStudent().getStudentId(), course.getCourseId());
-        if (!unmet.isEmpty()) {
-            throw new RuntimeException("Prerequisites not met: " + String.join(", ", unmet));
+        // Check prerequisites — skipped when registrar explicitly overrides (Option B)
+        if (!override) {
+            List<String> unmet = checkPrerequisites(enrollment.getStudent().getStudentId(), course.getCourseId());
+            if (!unmet.isEmpty()) {
+                throw new RuntimeException("Prerequisites not met: " + String.join(", ", unmet));
+            }
         }
 
         EnrollmentSubject es = EnrollmentSubject.builder()
@@ -156,6 +159,7 @@ public class EnrollmentService {
             .course(course)
             .schedule(schedule)
             .status(EnrollmentSubject.SubjectStatus.Enrolled)
+            .overrideReason(override ? overrideReason : null)
             .build();
         es = enrollmentSubjectRepository.save(es);
 
@@ -177,5 +181,19 @@ public class EnrollmentService {
     // LAYER 3 → LAYER 4: Calls enrollmentSubjectRepository.findByEnrollment_EnrollmentId()
     public List<EnrollmentSubject> getSubjectsByEnrollment(String enrollmentId) {
         return enrollmentSubjectRepository.findByEnrollment_EnrollmentId(enrollmentId);
+    }
+
+    // Enrolls multiple courses at once; rolls back everything if any single subject fails.
+    // overrideReasons maps courseId → registrar-supplied reason (Option B). Absent = normal prerequisite check.
+    @Transactional
+    public List<EnrollmentSubject> enrollSubjectsBulk(Enrollment enrollment, List<Course> courses,
+                                                       java.util.Map<String, String> overrideReasons) {
+        List<EnrollmentSubject> result = new ArrayList<>();
+        for (Course course : courses) {
+            String reason = overrideReasons != null ? overrideReasons.get(course.getCourseId()) : null;
+            boolean override = reason != null && !reason.isBlank();
+            result.add(enrollSubject(enrollment, course, null, override, reason));
+        }
+        return result;
     }
 }

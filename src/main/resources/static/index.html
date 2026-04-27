@@ -879,15 +879,20 @@
       </div>
       <button class="btn btn-outline btn-sm" onclick="closeModal('modal-enr-subjects')" style="font-size:1rem;padding:4px 10px">✕</button>
     </div>
-    <!-- Add Subject Form -->
-    <div id="enrs-add-form" style="display:none;margin:12px 0;padding:12px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:8px">
-      <div style="font-size:.8rem;font-weight:600;color:var(--gray-600);margin-bottom:8px">Add Subject</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <select id="enrs-course-select" style="flex:1;padding:9px 13px;border:1.5px solid var(--gray-200);border-radius:7px;font-size:.875rem;font-family:inherit;color:var(--gray-800);outline:none;background:white">
-          <option value="">Select course…</option>
-        </select>
-        <button class="btn btn-primary btn-sm registrar-only" onclick="addEnrollmentSubject()">Add</button>
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('enrs-add-form').style.display='none'">Cancel</button>
+    <!-- Add Subject Checklist -->
+    <div id="enrs-add-form" style="display:none;margin:12px 0;padding:14px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:.8rem;font-weight:600;color:var(--gray-600)">Select Subjects to Enroll</span>
+        <label style="font-size:.78rem;color:var(--gray-500);cursor:pointer;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="enrs-check-all" onchange="toggleAllCourseChecks(this.checked)"> Select all
+        </label>
+      </div>
+      <div id="enrs-checklist" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+        <p style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:12px 0">Loading available subjects…</p>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('enrs-add-form').style.display='none';document.getElementById('enrs-check-all').checked=false">Cancel</button>
+        <button class="btn btn-primary btn-sm registrar-only" onclick="enrollCheckedCourses()">Enroll Selected</button>
       </div>
     </div>
     <table class="data-table" style="margin-top:8px">
@@ -895,7 +900,7 @@
       <tbody id="enrs-body"></tbody>
     </table>
     <div class="modal-actions">
-      <button class="btn btn-outline registrar-only" onclick="toggleAddSubjectForm()">+ Add Subject</button>
+      <button class="btn btn-outline registrar-only" onclick="toggleCourseChecklist()">+ Add Subject</button>
       <button class="btn btn-primary" onclick="closeModal('modal-enr-subjects')">Close</button>
     </div>
   </div>

@@ -41,6 +41,8 @@ import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 // ── Enrollment ────────────────────────────────────────────────────────────────
 @RestController
@@ -55,6 +57,7 @@ class EnrollmentController {
     private final SemesterRepository semesterRepository;
     private final SectionRepository sectionRepository;
     private final CourseRepository courseRepository;
+    private final GradeRepository gradeRepository;
     private final AuditService auditService;
     private final ApplicantRepository applicantRepository;
     private final ApplicationRepository applicationRepository;
@@ -218,21 +221,121 @@ class EnrollmentController {
         return enrollmentService.getSubjectsByEnrollment(enrollmentId);
     }
 
-    // LAYER 1 → LAYER 2: Triggered by app.js addEnrollmentSubject() when the registrar adds a subject to an enrollment
-    // LAYER 2 → LAYER 3: Resolves the enrollment and course, then delegates to enrollmentService.enrollSubject()
-    //   which also checks prerequisites before saving
-    // LAYER 2 → LAYER 1: Returns the new EnrollmentSubject JSON, or 400 if prerequisites are not met
-    @PostMapping("/{enrollmentId}/subjects")
+    // Returns available courses for this enrollment's program/year/semester.
+    // Each item includes a 'type' field:
+    //   "regular" — new course, prerequisites met
+    //   "retake"  — student previously failed this course, prerequisites met (Option A)
+    //   "blocked" — prerequisites not met; includes 'blockedReason' (can be overridden, Option B)
+    @GetMapping("/{enrollmentId}/available-courses")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<?> enrollSubject(@PathVariable String enrollmentId,
-                                            @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> getAvailableCourses(@PathVariable String enrollmentId) {
         try {
             Enrollment enrollment = enrollmentRepository.findByEnrollmentId(enrollmentId)
                 .orElseThrow(() -> new RuntimeException("Enrollment not found"));
-            // SECURITY (A07): Fetch course from DB instead of constructing in-memory — prevents enrolling in non-existent courses
-            Course course = courseRepository.findByCourseId(body.get("courseId"))
-                .orElseThrow(() -> new RuntimeException("Course not found"));
-            return ResponseEntity.ok(enrollmentService.enrollSubject(enrollment, course, null));
+
+            String studentId      = enrollment.getStudent().getStudentId();
+            String programId      = enrollment.getProgram().getProgramId();
+            Integer yearLevel     = enrollment.getYearLevel();
+            Integer semesterNumber = enrollment.getSemester().getSemesterNumber();
+
+            // Courses already enrolled in this semester (non-dropped) — exclude from checklist
+            Set<String> alreadyEnrolled = enrollmentService.getSubjectsByEnrollment(enrollmentId)
+                .stream()
+                .filter(es -> es.getStatus() != EnrollmentSubject.SubjectStatus.Dropped)
+                .map(es -> es.getCourse().getCourseId())
+                .collect(Collectors.toSet());
+
+            // Courses the student previously failed — used to flag retakes (Option A)
+            Set<String> failedCourseIds = gradeRepository
+                .findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Failed)
+                .stream()
+                .map(g -> g.getCourse().getCourseId())
+                .collect(Collectors.toSet());
+
+            java.util.LinkedHashMap<String, java.util.HashMap<String, Object>> resultMap = new java.util.LinkedHashMap<>();
+
+            // 1. Courses for the student's current year level and semester
+            List<Course> semesterCourses = courseRepository
+                .findByProgram_ProgramIdAndYearLevelAndSemesterNumberAndIsActiveTrue(
+                    programId, yearLevel, semesterNumber);
+
+            for (Course c : semesterCourses) {
+                if (alreadyEnrolled.contains(c.getCourseId())) continue;
+                java.util.HashMap<String, Object> item = buildCourseItem(c, studentId, failedCourseIds);
+                resultMap.put(c.getCourseId(), item);
+            }
+
+            // 2. Failed courses from other year/semester combinations (retakes not in current list)
+            Set<String> semesterCourseIds = semesterCourses.stream()
+                .map(Course::getCourseId).collect(Collectors.toSet());
+
+            gradeRepository.findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Failed)
+                .stream()
+                .map(Grade::getCourse)
+                .filter(c -> c.getIsActive() && !alreadyEnrolled.contains(c.getCourseId())
+                             && !semesterCourseIds.contains(c.getCourseId()))
+                .forEach(c -> resultMap.putIfAbsent(c.getCourseId(), buildCourseItem(c, studentId, failedCourseIds)));
+
+            return ResponseEntity.ok(resultMap.values());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private java.util.HashMap<String, Object> buildCourseItem(Course c, String studentId, Set<String> failedCourseIds) {
+        List<String> unmet = enrollmentService.checkPrerequisites(studentId, c.getCourseId());
+        java.util.HashMap<String, Object> item = new java.util.HashMap<>();
+        item.put("courseId",   c.getCourseId());
+        item.put("courseCode", c.getCourseCode());
+        item.put("courseName", c.getCourseName());
+        item.put("units",      c.getUnits());
+        if (!unmet.isEmpty()) {
+            item.put("type", "blocked");
+            item.put("blockedReason", "Requires: " + String.join(", ", unmet));
+        } else {
+            item.put("type", failedCourseIds.contains(c.getCourseId()) ? "retake" : "regular");
+        }
+        return item;
+    }
+
+    // Bulk-enrolls courses; supports prerequisite override per course (Option B).
+    // Accepts: { "courseIds": [...], "overrides": { "C001": "Dean's approval" } }
+    @PostMapping("/{enrollmentId}/subjects/bulk")
+    @PreAuthorize("hasRole('Registrar')")
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<?> enrollSubjectsBulk(@PathVariable String enrollmentId,
+                                                 @RequestBody Map<String, Object> body) {
+        try {
+            Enrollment enrollment = enrollmentRepository.findByEnrollmentId(enrollmentId)
+                .orElseThrow(() -> new RuntimeException("Enrollment not found"));
+
+            List<String> courseIds = (List<String>) body.get("courseIds");
+            if (courseIds == null || courseIds.isEmpty())
+                return ResponseEntity.badRequest().body(Map.of("error", "No courses selected."));
+
+            // SECURITY (A07): Validate override reasons are non-empty strings, not injected objects
+            Map<String, String> overrides = new java.util.HashMap<>();
+            Object rawOverrides = body.get("overrides");
+            if (rawOverrides instanceof Map<?, ?> rawMap) {
+                rawMap.forEach((k, v) -> {
+                    if (k instanceof String key && v instanceof String val && !val.isBlank())
+                        overrides.put(key, val);
+                });
+            }
+
+            List<Course> courses = courseIds.stream()
+                .map(id -> courseRepository.findByCourseId(id)
+                    .orElseThrow(() -> new RuntimeException("Course not found: " + id)))
+                .toList();
+
+            List<EnrollmentSubject> enrolled = enrollmentService.enrollSubjectsBulk(enrollment, courses, overrides);
+
+            int overrideCount = (int) enrolled.stream().filter(es -> es.getOverrideReason() != null).count();
+            auditService.log("CREATE", "EnrollmentSubject",
+                "Bulk enrolled " + enrolled.size() + " subjects into " + enrollmentId
+                + (overrideCount > 0 ? " (" + overrideCount + " prerequisite override(s))" : ""));
+
+            return ResponseEntity.ok(enrolled);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {

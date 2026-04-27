@@ -46,4 +46,9 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     // Auto-generates: JOIN tblprogram ON ... WHERE tblprogram.fldProgramID = ? AND fldIsActive = 1
     // Called by: CurriculumController.getCourses() and EnrollmentController subject form
     List<Course> findByProgram_ProgramIdAndIsActiveTrue(String programId);
+
+    // Auto-generates: WHERE program = ? AND yearLevel = ? AND semesterNumber = ? AND isActive = 1
+    // Called by: available-courses endpoint to show only courses for the student's year and semester
+    List<Course> findByProgram_ProgramIdAndYearLevelAndSemesterNumberAndIsActiveTrue(
+        String programId, Integer yearLevel, Integer semesterNumber);
 }

@@ -61,6 +61,11 @@ public class EnrollmentSubject {
     @Builder.Default
     private SubjectStatus status = SubjectStatus.Enrolled;
 
+    // Populated only when a registrar overrides a failed prerequisite check (Option B).
+    // Null means the subject was enrolled normally with all prerequisites met.
+    @Column(name = "fldOverrideReason", length = 500)
+    private String overrideReason;
+
     @Column(name = "fldCreatedAt", nullable = false, updatable = false) private LocalDateTime createdAt;
 
     // Called automatically by Hibernate just before a new row is INSERTed

@@ -1997,7 +1997,9 @@ async function refreshSubjectsTable() {
     document.getElementById('enrs-body').innerHTML = data.length
       ? data.map(s => `<tr>
           <td>${escHtml(s.course?.courseCode || '—')}</td>
-          <td>${escHtml(s.course?.courseName || '—')}</td>
+          <td>${escHtml(s.course?.courseName || '—')}${s.overrideReason
+            ? `<span title="Override: ${escHtml(s.overrideReason)}" style="margin-left:6px;font-size:.7rem;font-weight:700;background:#fef3c7;color:#b45309;border-radius:4px;padding:1px 5px;cursor:default">OVR</span>`
+            : ''}</td>
           <td style="text-align:center">${escHtml(String(s.course?.units ?? '—'))}</td>
           <td>${badge(s.status)}</td>
         </tr>`).join('')
@@ -2005,33 +2007,120 @@ async function refreshSubjectsTable() {
   } catch (_) { toast('Failed to load subjects', 'error'); }
 }
 
-async function toggleAddSubjectForm() {
+async function toggleCourseChecklist() {
   const form = document.getElementById('enrs-add-form');
-  const isHidden = form.style.display === 'none';
-  if (isHidden) {
-    // Populate course select filtered by program
-    try {
-      const url = _currentEnrollmentPgm
-        ? `/api/curriculum/courses?program=${_currentEnrollmentPgm}`
-        : '/api/curriculum/courses';
-      const courses = await api(url);
-      const select = document.getElementById('enrs-course-select');
-      select.innerHTML = '<option value="">Select course…</option>' +
-        courses.map(c => `<option value="${escHtml(c.courseId)}">${escHtml(c.courseCode)} — ${escHtml(c.courseName)}</option>`).join('');
-    } catch (_) { toast('Failed to load courses', 'error'); return; }
-    form.style.display = 'block';
-  } else {
-    form.style.display = 'none';
+  if (form.style.display !== 'none') { form.style.display = 'none'; return; }
+
+  const checklist = document.getElementById('enrs-checklist');
+  checklist.innerHTML = '<p style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:12px 0">Loading available subjects…</p>';
+  form.style.display = 'block';
+  document.getElementById('enrs-check-all').checked = false;
+
+  try {
+    const courses = await api(`/api/enrollment/${_currentEnrollmentId}/available-courses`);
+    if (!courses.length) {
+      checklist.innerHTML = '<p style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:12px 0">All subjects for this year and semester are already enrolled.</p>';
+      return;
+    }
+    checklist.innerHTML = courses.map(c => {
+      const id = escHtml(c.courseId);
+      const units = `${escHtml(String(c.units))} unit${c.units !== 1 ? 's' : ''}`;
+
+      if (c.type === 'blocked') {
+        // Blocked: greyed out — checkbox disabled until registrar fills override reason (Option B)
+        return `
+        <div style="border:1.5px solid var(--gray-200);border-radius:7px;overflow:hidden;opacity:.75">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--gray-50);font-size:.875rem;color:var(--gray-500)">
+            <input type="checkbox" class="enrs-course-cb" value="${id}" disabled
+              style="width:15px;height:15px;flex-shrink:0">
+            <span style="font-size:.7rem;font-weight:700;background:var(--gray-200);color:var(--gray-600);border-radius:4px;padding:2px 6px;white-space:nowrap">BLOCKED</span>
+            <span style="font-weight:600;min-width:52px">${escHtml(c.courseCode)}</span>
+            <span style="flex:1">${escHtml(c.courseName)}</span>
+            <span style="font-size:.8rem;white-space:nowrap">${units}</span>
+            <button type="button" onclick="toggleOverrideField('ovr-${id}')"
+              style="font-size:.75rem;color:var(--primary);background:none;border:none;cursor:pointer;white-space:nowrap;text-decoration:underline">Override?</button>
+          </div>
+          <div style="font-size:.75rem;color:var(--gray-500);padding:2px 10px 4px 44px">${escHtml(c.blockedReason)}</div>
+          <div id="ovr-${id}" style="display:none;padding:6px 10px;border-top:1px solid var(--gray-200);background:white">
+            <input type="text" placeholder="Enter override reason (e.g. Dean's approval)…"
+              data-override-for="${id}"
+              oninput="handleOverrideInput(this)"
+              style="width:100%;padding:7px 10px;border:1.5px solid var(--warning,#f59e0b);border-radius:6px;font-size:.8rem;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+        </div>`;
+      }
+
+      if (c.type === 'retake') {
+        // Retake: amber highlight, checked by default (Option A)
+        return `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:7px;cursor:pointer;font-size:.875rem;color:var(--gray-800)">
+          <input type="checkbox" class="enrs-course-cb" value="${id}" checked
+            style="width:15px;height:15px;accent-color:#f59e0b;flex-shrink:0">
+          <span style="font-size:.7rem;font-weight:700;background:#fef3c7;color:#b45309;border-radius:4px;padding:2px 6px;white-space:nowrap">RETAKE</span>
+          <span style="font-weight:600;color:#b45309;min-width:52px">${escHtml(c.courseCode)}</span>
+          <span style="flex:1">${escHtml(c.courseName)}</span>
+          <span style="color:var(--gray-400);font-size:.8rem;white-space:nowrap">${units}</span>
+        </label>`;
+      }
+
+      // Regular course
+      return `
+      <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:white;border:1.5px solid var(--gray-200);border-radius:7px;cursor:pointer;font-size:.875rem;color:var(--gray-800)">
+        <input type="checkbox" class="enrs-course-cb" value="${id}"
+          style="width:15px;height:15px;accent-color:var(--primary);flex-shrink:0">
+        <span style="font-weight:600;color:var(--primary);min-width:52px">${escHtml(c.courseCode)}</span>
+        <span style="flex:1">${escHtml(c.courseName)}</span>
+        <span style="color:var(--gray-400);font-size:.8rem;white-space:nowrap">${units}</span>
+      </label>`;
+    }).join('');
+  } catch (e) { toast('Failed to load available subjects', 'error'); form.style.display = 'none'; }
+}
+
+function toggleOverrideField(divId) {
+  const div = document.getElementById(divId);
+  if (!div) return;
+  const isHidden = div.style.display === 'none';
+  div.style.display = isHidden ? 'block' : 'none';
+  if (!isHidden) {
+    // Collapsing: clear input and re-disable checkbox
+    const input = div.querySelector('input[data-override-for]');
+    if (input) { input.value = ''; handleOverrideInput(input); }
   }
 }
 
-async function addEnrollmentSubject() {
-  const courseId = document.getElementById('enrs-course-select').value;
-  if (!courseId) { toast('Please select a course', 'error'); return; }
+function handleOverrideInput(input) {
+  const courseId = input.dataset.overrideFor;
+  const cb = document.querySelector(`.enrs-course-cb[value="${courseId}"]`);
+  if (!cb) return;
+  const hasReason = input.value.trim().length > 0;
+  cb.disabled = !hasReason;
+  cb.checked  = hasReason;
+}
+
+function toggleAllCourseChecks(checked) {
+  // Only toggle non-blocked (enabled) checkboxes
+  document.querySelectorAll('.enrs-course-cb:not([disabled])').forEach(cb => cb.checked = checked);
+}
+
+async function enrollCheckedCourses() {
+  const courseIds = [...document.querySelectorAll('.enrs-course-cb:checked:not([disabled])')].map(cb => cb.value);
+  if (!courseIds.length) { toast('Please select at least one subject', 'error'); return; }
+
+  // Collect override reasons for blocked courses that were unlocked (Option B)
+  const overrides = {};
+  document.querySelectorAll('input[data-override-for]').forEach(input => {
+    const reason = input.value.trim();
+    if (reason && courseIds.includes(input.dataset.overrideFor))
+      overrides[input.dataset.overrideFor] = reason;
+  });
+
   try {
-    await api(`/api/enrollment/${_currentEnrollmentId}/subjects`, 'POST', { courseId });
-    toast('Subject added successfully');
+    await api(`/api/enrollment/${_currentEnrollmentId}/subjects/bulk`, 'POST', { courseIds, overrides });
+    const overrideCount = Object.keys(overrides).length;
+    toast(`${courseIds.length} subject${courseIds.length > 1 ? 's' : ''} enrolled`
+      + (overrideCount ? ` (${overrideCount} with override)` : ''));
     document.getElementById('enrs-add-form').style.display = 'none';
+    document.getElementById('enrs-check-all').checked = false;
     await refreshSubjectsTable();
   } catch (e) { toast(e.message, 'error'); }
 }

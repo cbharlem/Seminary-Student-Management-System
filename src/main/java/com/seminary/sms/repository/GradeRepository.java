@@ -63,4 +63,8 @@ public interface GradeRepository extends JpaRepository<Grade, Integer> {
     // Called by: EnrollmentService.checkPrerequisites() before allowing a student to enroll in a course
     @Query("SELECT g FROM Grade g WHERE g.student.studentId = :studentId AND g.course.courseId = :courseId AND g.gradeStatus = :status")
     Optional<Grade> findPassedGrade(@Param("studentId") String studentId, @Param("courseId") String courseId, @Param("status") Grade.GradeStatus status);
+
+    // Auto-generates: JOIN tblstudents ... WHERE fldStudentID = ? AND fldGradeStatus = ?
+    // Called by: EnrollmentController.getAvailableCourses() to identify courses the student must retake
+    List<Grade> findByStudent_StudentIdAndGradeStatus(String studentId, Grade.GradeStatus gradeStatus);
 }
