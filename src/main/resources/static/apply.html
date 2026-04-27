@@ -287,15 +287,6 @@
           <input type="text" id="placeOfBirth" name="placeOfBirth"
                  placeholder="e.g. Lipa City, Batangas"/>
         </div>
-        <div class="field">
-          <label for="gender">Gender</label>
-          <select id="gender" name="gender">
-            <option value="">— Select —</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
       </div>
     </div>
 
@@ -491,7 +482,7 @@ form.addEventListener('submit', async (e) => {
     lastName,
     dateOfBirth:        dob,
     placeOfBirth:       val('placeOfBirth')        || null,
-    gender:             val('gender')              || null,
+    gender:             'Male',
     email,
     contactNumber:      val('contactNumber')       || null,
     nationality:        val('nationality')         || null,

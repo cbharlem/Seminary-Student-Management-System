@@ -255,7 +255,7 @@
 <div id="page-applicants" class="page">
   <div class="page-header">
     <div><h2>Applicants</h2><p>Manage the admissions pipeline</p></div>
-    <button class="btn btn-primary registrar-only" onclick="['ap-fname','ap-lname','ap-mname','ap-dob','ap-pob','ap-email','ap-contact','ap-nationality','ap-religion','ap-address','ap-father','ap-father-occ','ap-mother','ap-mother-occ','ap-guardian','ap-guardian-contact','ap-school','ap-school-year','ap-year-level'].forEach(id=>{document.getElementById(id).value=''}); document.getElementById('ap-gender').value=''; openModal('modal-applicant')">+ Add Applicant</button>
+    <button class="btn btn-primary registrar-only" onclick="['ap-fname','ap-lname','ap-mname','ap-dob','ap-pob','ap-email','ap-contact','ap-nationality','ap-religion','ap-address','ap-father','ap-father-occ','ap-mother','ap-mother-occ','ap-guardian','ap-guardian-contact','ap-school','ap-school-year','ap-year-level'].forEach(id=>{document.getElementById(id).value=''}); openModal('modal-applicant')">+ Add Applicant</button>
   </div>
   <div class="pipeline" id="pipeline-display">
     <div class="pipe-step"><div class="pipe-dot done" id="pc-applied">0</div><div class="pipe-label">Applied</div></div>
@@ -517,11 +517,8 @@
 <div id="page-reports" class="page">
   <div class="page-header"><div><h2>Reports & Outputs</h2><p>Generate and export official academic documents</p></div></div>
   <div class="report-grid">
-    <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div><h4>Transcript of Records</h4><p>Official TOR for a student including all grades</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('TranscriptOfRecords')">Generate</button></div></div>
     <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg></div><h4>Grade Card</h4><p>Per-semester grade card per student</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('GradeCard')">Generate</button></div></div>
-    <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div><h4>Summary of Grades</h4><p>Consolidated grade summary per semester</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('SummaryOfGrades')">Generate</button></div></div>
-    <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M12 1l2.5 6.5H22l-6 4.5 2.3 6.5L12 15l-6.3 3.5L8 12 2 7.5h7.5z"/></svg></div><h4>Grade Certificate</h4><p>Official certificate for individual students</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('GradeCertificate')">Generate</button></div></div>
-    <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg></div><h4>Enrollment Statistics</h4><p>Enrollment count by program and semester</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('EnrollmentStatistics')">Generate</button></div></div>
+    <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div><h4>Transcript of Records</h4><p>Official TOR for a student including all grades</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('TranscriptOfRecords')">Generate</button></div></div>
     <div class="report-card"><div class="rc-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#1d4ed8"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div><h4>CHED Report</h4><p>CHED-required enrollment and compliance reports</p><div class="rc-actions"><button class="btn btn-primary btn-sm" onclick="openReportModal('CHEDReport')">Generate</button></div></div>
   </div>
 </div>
@@ -700,7 +697,6 @@
       <div class="field"><label>Middle Name</label><input id="sv-mname" readonly class="input-readonly"/></div>
       <div class="field"><label>Date of Birth</label><input id="sv-dob" readonly class="input-readonly"/></div>
       <div class="field"><label>Place of Birth</label><input id="sv-pob" readonly class="input-readonly"/></div>
-      <div class="field"><label>Gender</label><input id="sv-gender" readonly class="input-readonly"/></div>
     </div>
 
     <div class="sec-divider">Contact &amp; Identity</div>
@@ -775,7 +771,6 @@
       <div class="field"><label for="ap-mname">Middle Name</label><input id="ap-mname"/></div>
       <div class="field"><label for="ap-dob">Date of Birth <span style="color:var(--danger)">*</span></label><input id="ap-dob" type="date" required/></div>
       <div class="field"><label for="ap-pob">Place of Birth</label><input id="ap-pob"/></div>
-      <div class="field"><label for="ap-gender">Gender</label><select id="ap-gender"><option value="">-- Select --</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
     </div>
 
     <div class="sec-divider">Contact &amp; Identity</div>
@@ -838,7 +833,6 @@
       <div class="field"><label for="st-lname">Last Name <span style="color:var(--danger)">*</span></label><input id="st-lname" required/></div>
       <div class="field"><label for="st-mname">Middle Name</label><input id="st-mname"/></div>
       <div class="field"><label for="st-dob">Date of Birth <span style="color:var(--danger)">*</span></label><input id="st-dob" type="date" required/></div>
-      <div class="field"><label for="st-gender">Gender</label><select id="st-gender"><option value="">-- Select --</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
       <div class="field"><label for="st-nationality">Nationality</label><input id="st-nationality" value="Filipino"/></div>
       <div class="field"><label for="st-contact">Contact Number</label><input id="st-contact" type="tel" placeholder="e.g. 09171234567"/></div>
       <div class="field"><label for="st-email">Email <span style="color:var(--danger)">*</span></label><input id="st-email" type="email" required placeholder="e.g. juan@email.com"/></div>
@@ -1250,11 +1244,10 @@
 <!-- Report -->
 <div class="modal-overlay" id="modal-gen-report">
   <div class="modal">
-    <h3 id="gen-report-title">Generate Report</h3><p class="modal-sub">Leave Student blank to include all students</p>
+    <h3 id="gen-report-title">Generate Report</h3><p class="modal-sub" id="gen-report-sub"></p>
     <div class="modal-grid">
-      <div class="field full"><label for="gen-report-student">Student</label><select id="gen-report-student"></select></div>
-      <div class="field"><label for="gen-report-sem">Semester</label><select id="gen-report-sem"></select></div>
-      <div class="field"><label for="gen-report-format">Format</label><select id="gen-report-format"><option value="PDF">PDF</option><option value="XLSX">Excel (XLSX)</option></select></div>
+      <div class="field full" id="gen-report-student-wrap"><label for="gen-report-student">Student <span style="color:var(--danger)">*</span></label><select id="gen-report-student"></select></div>
+      <div class="field full" id="gen-report-sem-wrap"><label for="gen-report-sem">Semester <span style="color:var(--danger)">*</span></label><select id="gen-report-sem"></select></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-gen-report')">Cancel</button>

@@ -330,7 +330,7 @@ async function viewStudent(id) {
       <div class="info-item"><span class="i-label">Year Level</span><span class="i-val">${escHtml(s.currentYearLevel)}</span></div>
       <div class="info-item"><span class="i-label">Email</span><span class="i-val" style="font-size:.75rem">${escHtml(s.email)}</span></div>
       <div class="info-item"><span class="i-label">Contact</span><span class="i-val">${escHtml(s.contactNumber || '—')}</span></div>`;
-    document.getElementById('sd-personal-fields').innerHTML = readonlyField('First Name',s.firstName) + readonlyField('Last Name',s.lastName) + readonlyField('Middle Name',s.middleName) + readonlyField('Date of Birth',fmtDate(s.dateOfBirth)) + readonlyField('Gender',s.gender) + readonlyField('Nationality',s.nationality || '—') + readonlyField('Email',s.email) + readonlyField('Contact',s.contactNumber || '—') + readonlyField('Blood Type',s.bloodType || '—') + readonlyField('Medical Conditions',s.medicalConditions || 'None');
+    document.getElementById('sd-personal-fields').innerHTML = readonlyField('First Name',s.firstName) + readonlyField('Last Name',s.lastName) + readonlyField('Middle Name',s.middleName) + readonlyField('Date of Birth',fmtDate(s.dateOfBirth)) + readonlyField('Nationality',s.nationality || '—') + readonlyField('Email',s.email) + readonlyField('Contact',s.contactNumber || '—') + readonlyField('Blood Type',s.bloodType || '—') + readonlyField('Medical Conditions',s.medicalConditions || 'None');
     document.getElementById('sd-family-fields').innerHTML   = readonlyField("Father's Name",s.fatherName || '—') + readonlyField("Father's Occupation",s.fatherOccupation || '—') + readonlyField("Mother's Name",s.motherName || '—') + readonlyField("Mother's Occupation",s.motherOccupation || '—') + readonlyField("Guardian",s.guardianName || '—') + readonlyField("Guardian Contact",s.guardianContact || '—');
     document.getElementById('sd-religious-fields').innerHTML = readonlyField("Religion",s.religion || '—') + readonlyField("Diocese",s.diocese || '—') + readonlyField("Parish Priest",s.parishPriest || '—') + readonlyField("Baptism Date",fmtDate(s.baptismDate)) + readonlyField("Baptism Church",s.baptismChurch || '—') + readonlyField("Confirmation Date",fmtDate(s.confirmationDate));
 
@@ -902,7 +902,7 @@ async function loadMyProfile() {
         <div class="info-item"><span class="i-label">Email</span><span class="i-val" style="font-size:.75rem">${escHtml(s.email)}</span></div>`;
       document.getElementById('mp-fields').innerHTML =
         readonlyField('First Name', s.firstName) + readonlyField('Last Name', s.lastName) +
-        readonlyField('Date of Birth', fmtDate(s.dateOfBirth)) + readonlyField('Gender', s.gender) +
+        readonlyField('Date of Birth', fmtDate(s.dateOfBirth)) +
         readonlyField('Nationality', s.nationality || '—') + readonlyField('Religion', s.religion || '—');
     } catch (e) { console.error(e); }
   } else {
@@ -1004,7 +1004,7 @@ async function saveApplicant() {
       middleName:       document.getElementById('ap-mname').value,
       dateOfBirth:      document.getElementById('ap-dob').value,
       placeOfBirth:     document.getElementById('ap-pob').value,
-      gender:           document.getElementById('ap-gender').value || null,
+      gender:           'Male',
       email:            document.getElementById('ap-email').value,
       contactNumber:    document.getElementById('ap-contact').value,
       nationality:      document.getElementById('ap-nationality').value,
@@ -1060,7 +1060,6 @@ function openEditStudentModal() {
   document.getElementById('st-lname').value      = s.lastName || '';
   document.getElementById('st-mname').value      = s.middleName || '';
   document.getElementById('st-dob').value        = s.dateOfBirth || '';
-  document.getElementById('st-gender').value     = s.gender || '';
   document.getElementById('st-nationality').value= s.nationality || '';
   document.getElementById('st-contact').value    = s.contactNumber || '';
   document.getElementById('st-email').value      = s.email || '';
@@ -1104,7 +1103,7 @@ async function saveStudent() {
     lastName:         document.getElementById('st-lname').value,
     middleName:       document.getElementById('st-mname').value,
     dateOfBirth:      document.getElementById('st-dob').value,
-    gender:           document.getElementById('st-gender').value,
+    gender:           'Male',
     nationality:      document.getElementById('st-nationality').value,
     contactNumber:    document.getElementById('st-contact').value,
     email:            document.getElementById('st-email').value,
@@ -1768,20 +1767,61 @@ async function saveExam() {
 
 function openReportModal(type) {
   _currentReportType = type;
-  document.getElementById('gen-report-title').textContent = type.replace(/([A-Z])/g, ' $1').trim();
-  api('/api/students').then(students => {
-    populateSelect('gen-report-student', students, 'studentId',
-      s => `${s.firstName} ${s.lastName} (${s.studentId})`, 'All Students');
-  }).catch(_=>{});
-  api('/api/school-years/semesters').then(sems => {
-    populateSelect('gen-report-sem', sems, 'semesterId', s => s.semesterLabel, '');
-  }).catch(_=>{});
+
+  const titles = {
+    GradeCard:           'Grade Card',
+    TranscriptOfRecords: 'Transcript of Records',
+    CHEDReport:          'CHED Report',
+  };
+  const subs = {
+    GradeCard:           'Select a student and semester to generate the grade card.',
+    TranscriptOfRecords: 'Select a student to generate their full transcript.',
+    CHEDReport:          'Select a semester to generate the CHED compliance report.',
+  };
+  document.getElementById('gen-report-title').textContent = titles[type] || type;
+  document.getElementById('gen-report-sub').textContent   = subs[type]   || '';
+
+  const showStudent  = type === 'GradeCard' || type === 'TranscriptOfRecords';
+  const showSemester = type === 'GradeCard' || type === 'CHEDReport';
+
+  document.getElementById('gen-report-student-wrap').style.display = showStudent  ? '' : 'none';
+  document.getElementById('gen-report-sem-wrap').style.display     = showSemester ? '' : 'none';
+
+  if (showStudent) {
+    api('/api/students').then(students => {
+      populateSelect('gen-report-student', students, 'studentId',
+        s => `${s.firstName} ${s.lastName} (${s.studentId})`, '— Select Student —');
+    }).catch(_=>{});
+  }
+  if (showSemester) {
+    api('/api/school-years/semesters').then(sems => {
+      populateSelect('gen-report-sem', sems, 'semesterId', s => s.semesterLabel, '— Select Semester —');
+    }).catch(_=>{});
+  }
   openModal('modal-gen-report');
 }
 
 function generateReport() {
-  toast('Report generation requires backend PDF/XLSX implementation. API endpoint ready at /api/reports.', 'info');
+  const type       = _currentReportType;
+  const studentId  = document.getElementById('gen-report-student').value;
+  const semesterId = document.getElementById('gen-report-sem').value;
+
+  let url;
+  if (type === 'GradeCard') {
+    if (!studentId || !semesterId) { toast('Please select a student and a semester.', 'error'); return; }
+    url = `/api/reports/grade-card?studentId=${encodeURIComponent(studentId)}&semesterId=${encodeURIComponent(semesterId)}`;
+  } else if (type === 'TranscriptOfRecords') {
+    if (!studentId) { toast('Please select a student.', 'error'); return; }
+    url = `/api/reports/transcript?studentId=${encodeURIComponent(studentId)}`;
+  } else if (type === 'CHEDReport') {
+    if (!semesterId) { toast('Please select a semester.', 'error'); return; }
+    url = `/api/reports/ched-report?semesterId=${encodeURIComponent(semesterId)}`;
+  } else {
+    toast('Unknown report type.', 'error'); return;
+  }
+
   closeModal('modal-gen-report');
+  window.open(url, '_blank');
 }
 
 function triggerBackup() {
@@ -2108,7 +2148,6 @@ async function openSubmissionDetail(id) {
     sv('sv-mname',         s.middleName || '—');
     sv('sv-dob',           s.dateOfBirth || '—');
     sv('sv-pob',           s.placeOfBirth || '—');
-    sv('sv-gender',        s.gender || '—');
     sv('sv-email',         s.email || '—');
     sv('sv-contact',       s.contactNumber || '—');
     sv('sv-nationality',   s.nationality || '—');
