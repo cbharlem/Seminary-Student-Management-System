@@ -82,10 +82,25 @@ public class EnrollmentService {
     // @Transactional: if any save fails, neither the enrollment nor the section assignment is committed
     @Transactional
     public Enrollment enroll(Student student, Program program, Semester semester, Section section, Integer yearLevel) {
-        // Check if already enrolled
+        // Check if already enrolled in this exact semester
         if (enrollmentRepository.findByStudent_StudentIdAndSemester_SemesterId(
                 student.getStudentId(), semester.getSemesterId()).isPresent()) {
             throw new RuntimeException("Student is already enrolled this semester.");
+        }
+
+        // Block re-enrollment in the same year level and semester number they have already completed
+        boolean alreadyDoneThisYearSemester = enrollmentRepository
+            .findByStudent_StudentIdAndYearLevel(student.getStudentId(), yearLevel)
+            .stream()
+            .filter(e -> e.getEnrollmentStatus() != Enrollment.EnrollmentStatus.Dropped
+                      && e.getEnrollmentStatus() != Enrollment.EnrollmentStatus.Withdrawn)
+            .anyMatch(e -> e.getSemester().getSemesterNumber().equals(semester.getSemesterNumber()));
+        if (alreadyDoneThisYearSemester) {
+            String semLabel = semester.getSemesterNumber() == 1 ? "1st Semester"
+                            : semester.getSemesterNumber() == 2 ? "2nd Semester" : "Summer";
+            throw new RuntimeException(
+                "Student has already been enrolled in Year " + yearLevel + " – " + semLabel +
+                ". Cannot re-enroll in the same year and semester.");
         }
 
         String enrollmentId = "ENR-" + String.format("%03d", 1 + enrollmentRepository.count());

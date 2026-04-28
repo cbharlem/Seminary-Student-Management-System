@@ -33,7 +33,7 @@ public class Course {
     @Column(name = "fldCourseID", nullable = false, unique = true, length = 30)
     private String courseId;
 
-    @Column(name = "fldCourseCode", nullable = false, unique = true, length = 30)
+    @Column(name = "fldCourseCode", nullable = false, length = 30)
     private String courseCode;
 
     @Column(name = "fldCourseName", nullable = false, length = 100)
@@ -48,6 +48,13 @@ public class Course {
     @JoinColumn(name = "fldProgramIndex", nullable = false)
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private Program program;
+
+    // Links this course to a specific curriculum version (e.g., "2024-2025 Curriculum").
+    // Nullable so existing rows survive before the SQL migration assigns them.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fldCurriculumIndex")
+    @ToString.Exclude @EqualsAndHashCode.Exclude
+    private Curriculum curriculum;
 
     @Column(name = "fldYearLevel", nullable = false, columnDefinition = "TINYINT")
     private Integer yearLevel;

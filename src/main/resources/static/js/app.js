@@ -27,9 +27,11 @@ function toggleSidebar() {
 const sdTabs   = ['sd-personal','sd-family','sd-religious','sd-grades-tab','sd-hist-tab'];
 const stTabs   = ['st-tab-personal','st-tab-family','st-tab-religious','st-tab-academic'];
 const currTabs = ['curr-philo','curr-theo'];
-let _currCourses = {};
-let _currYear    = { 'PRG-1001': 1, 'PRG-1002': 1 };
-let _currSem     = { 'PRG-1001': 1, 'PRG-1002': 1 };
+let _currCourses        = {};
+let _currYear           = { 'PRG-1001': 1, 'PRG-1002': 1 };
+let _currSem            = { 'PRG-1001': 1, 'PRG-1002': 1 };
+let _curricula          = {};   // { 'PRG-1001': [...Curriculum], 'PRG-1002': [...] }
+let _selectedCurriculum = {};   // { 'PRG-1001': 'CUR-001', 'PRG-1002': 'CUR-002' }
 
 // ── Color Palette for schedule items ─────────────────────────
 const SCHED_COLORS = ['#0d1b5e','#2e4bbd','#2d7d46','#b45309','#1d4ed8','#7c3aed','#0891b2'];
@@ -50,6 +52,7 @@ function validateRequired(fields) {
 // ── State ─────────────────────────────────────────────────────
 let _instructorCache = {};
 let _enrStudents = [];
+let _allEnrSections = [];
 let _currentStudentId = null;
 let _scheduleCache = {};
 let _currentStudent = null;
@@ -65,7 +68,7 @@ const pageLoaders = {
   enrollment:     loadEnrollment,
   students:       loadStudents,
   alumni:         loadAlumni,
-  curriculum:     () => { loadCurriculum('PRG-1001'); },
+  curriculum:     () => { loadCurricula('PRG-1001'); },
   sections:       loadSections,
   schedule:       loadSchedule,
   grades:         loadGrades,
@@ -391,37 +394,86 @@ async function confirmUnmarkAlumni() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+// Loads all curriculum versions for a program, auto-selects the active one, then loads its courses.
+async function loadCurricula(programId) {
+  try {
+    const data = await api(`/api/curriculum/curricula?program=${programId}`);
+    _curricula[programId] = data;
+    const active = data.find(c => c.isActive) || data[0];
+    if (active) {
+      _selectedCurriculum[programId] = active.curriculumId;
+    }
+    renderCurriculaSelector(programId);
+    await loadCurriculum(programId);
+  } catch (e) { console.error(e); }
+}
+
+// Populates the curriculum version <select> and status badge for the given program.
+function renderCurriculaSelector(programId) {
+  const selectId = programId === 'PRG-1001' ? 'philo-curriculum-select' : 'theo-curriculum-select';
+  const badgeId  = programId === 'PRG-1001' ? 'philo-curriculum-badge'  : 'theo-curriculum-badge';
+  const sel      = document.getElementById(selectId);
+  const badgeEl  = document.getElementById(badgeId);
+  if (!sel) return;
+  sel.innerHTML = (_curricula[programId] || []).map(c =>
+    `<option value="${escHtml(c.curriculumId)}">${escHtml(c.label)}${c.isActive ? ' (Active)' : ''}</option>`
+  ).join('');
+  const selected = _selectedCurriculum[programId];
+  if (selected) sel.value = selected;
+  const cur = (_curricula[programId] || []).find(c => c.curriculumId === selected);
+  badgeEl.innerHTML = cur
+    ? (cur.isActive ? badge('Active', 'success') : badge('Historical', 'warn'))
+    : '';
+}
+
+// Fetches courses for the currently selected curriculum version and renders the table.
 async function loadCurriculum(programId) {
   try {
-    const data = await api(`/api/curriculum/courses?program=${programId}`);
+    const curriculumId = _selectedCurriculum[programId];
+    const url = curriculumId
+      ? `/api/curriculum/courses?curriculum=${curriculumId}`
+      : `/api/curriculum/courses?program=${programId}`;
+    const data = await api(url);
     data.forEach(c => { _courseMap[c.courseId] = c; });
     _currCourses[programId] = data;
     renderCurriculumTable(programId);
+    _updateAddCourseButtonState(programId);
   } catch (e) { console.error(e); }
+}
+
+// Disables the "+ Add Course" button when viewing a historical (non-active) curriculum.
+function _updateAddCourseButtonState(programId) {
+  const cur = (_curricula[programId] || []).find(c => c.curriculumId === _selectedCurriculum[programId]);
+  const btn = document.getElementById('btn-add-course');
+  if (btn) btn.disabled = !(cur?.isActive === true);
 }
 
 function renderCurriculumTable(programId) {
   const tbodyId = programId === 'PRG-1001' ? 'tbl-curr-philo' : 'tbl-curr-theo';
-  const tbody = document.getElementById(tbodyId);
-  const year  = _currYear[programId] || 1;
-  const sem   = _currSem[programId]  || 1;
-  const rows  = (_currCourses[programId] || []).filter(c => c.yearLevel === year && c.semesterNumber === sem);
+  const tbody   = document.getElementById(tbodyId);
+  const year    = _currYear[programId] || 1;
+  const sem     = _currSem[programId]  || 1;
+  const rows    = (_currCourses[programId] || []).filter(c => c.yearLevel === year && c.semesterNumber === sem);
+  const cur     = (_curricula[programId] || []).find(c => c.curriculumId === _selectedCurriculum[programId]);
+  const editable = cur?.isActive === true;
+
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No courses for this semester.</p></div></td></tr>';
     return;
   }
-  tbody.innerHTML = rows.map(c =>
-    `<tr>
+  tbody.innerHTML = rows.map(c => {
+    const actions = editable
+      ? `<button class="btn btn-outline btn-sm registrar-only" onclick="openCourseModal('${escHtml(c.courseId)}')">Edit</button>
+         <button class="btn btn-danger btn-sm registrar-only" onclick="deleteCourse('${escHtml(c.courseId)}')">Delete</button>`
+      : `<span style="color:var(--muted);font-size:.8rem">Read-only</span>`;
+    return `<tr>
       <td>${escHtml(c.courseCode)}</td>
       <td>${escHtml(c.courseName)}</td>
       <td>${c.units}</td>
       <td>${c.prerequisites?.length ? c.prerequisites.map(p => badge(p.prerequisiteCourse?.courseCode,'warn')).join(' ') : 'None'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-outline btn-sm registrar-only" onclick="openCourseModal('${escHtml(c.courseId)}')">Edit</button>
-        <button class="btn btn-danger btn-sm registrar-only" onclick="deleteCourse('${escHtml(c.courseId)}')">Delete</button>
-      </td>
-    </tr>`
-  ).join('');
+      <td style="white-space:nowrap">${actions}</td>
+    </tr>`;
+  }).join('');
 }
 
 function currYearTab(el, programId, year) {
@@ -442,7 +494,13 @@ function currSemTab(el, programId, sem) {
 
 function currTab(el, showId, programId) {
   switchTab(el, showId, currTabs);
-  loadCurriculum(programId);
+  loadCurricula(programId);
+}
+
+async function onCurriculumChange(programId, curriculumId) {
+  _selectedCurriculum[programId] = curriculumId;
+  renderCurriculaSelector(programId);
+  await loadCurriculum(programId);
 }
 
 async function loadSections() {
@@ -1181,6 +1239,7 @@ let _enrollTab = 'applicant';
 
 function switchEnrollTab(tab) {
   _enrollTab = tab;
+  clearEnrollError();
   document.getElementById('enr-panel-applicant').style.display = tab === 'applicant' ? '' : 'none';
   document.getElementById('enr-panel-student').style.display   = tab === 'student'   ? '' : 'none';
   document.getElementById('enr-tab-applicant').style.background = tab === 'applicant' ? 'var(--navy)' : 'white';
@@ -1189,9 +1248,25 @@ function switchEnrollTab(tab) {
   document.getElementById('enr-tab-student').style.color       = tab === 'student'   ? 'white' : 'var(--gray-600)';
 }
 
+function filterEnrSections(panel) {
+  const yearEl  = document.getElementById(panel === 'app' ? 'enr-app-year'     : 'enr-year');
+  const selectEl = document.getElementById(panel === 'app' ? 'enr-app-section' : 'enr-section');
+  if (!yearEl || !selectEl) return;
+  const year = parseInt(yearEl.value);
+  const filtered = _allEnrSections.filter(s => s.yearLevel === year);
+  selectEl.innerHTML = '<option value="">No section</option>';
+  filtered.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.sectionId;
+    opt.textContent = s.sectionName;
+    selectEl.appendChild(opt);
+  });
+}
+
 async function openEnrollModal() {
   _enrollTab = 'applicant';
   switchEnrollTab('applicant');
+  clearEnrollError();
 
   // Reset fields
   const searchEl = document.getElementById('enr-student-search');
@@ -1224,20 +1299,15 @@ async function openEnrollModal() {
     renderEnrStudentOptions('');
   } catch (_) {}
 
-  // Shared: semesters and sections
+  // Show active semester label (read-only)
+  const semLabel = document.getElementById('enr-active-sem-label');
+  if (semLabel) semLabel.textContent = SMS.activeSemester?.semesterLabel || '—';
+
+  // Load all sections once; filtering by year level is done client-side
   try {
-    const sems = await api('/api/school-years/semesters');
-    populateSelect('enr-semester', sems, 'semesterId', s => s.semesterLabel, '');
-    populateSelect('enr-app-semester', sems, 'semesterId', s => s.semesterLabel, '');
-    if (SMS.activeSemester) {
-      document.getElementById('enr-semester').value     = SMS.activeSemester.semesterId;
-      document.getElementById('enr-app-semester').value = SMS.activeSemester.semesterId;
-    }
-  } catch (_) {}
-  try {
-    const sections = await api('/api/sections');
-    populateSelect('enr-section',     sections, 'sectionId', s => s.sectionName, 'No section');
-    populateSelect('enr-app-section', sections, 'sectionId', s => s.sectionName, 'No section');
+    _allEnrSections = await api('/api/sections');
+    filterEnrSections('app');
+    filterEnrSections('std');
   } catch (_) {}
 
   openModal('modal-enroll');
@@ -1256,10 +1326,11 @@ async function saveEnrollment() {
     if (!validateRequired([
       {id:'enr-student',  label:'Student'},
       {id:'enr-program',  label:'Program'},
-      {id:'enr-semester', label:'Semester'},
       {id:'enr-year',     label:'Year Level'},
     ])) return;
   }
+  if (!SMS.activeSemester) { showEnrollError('No active semester is set. Please set an active semester first.'); return; }
+  const activeSemId = SMS.activeSemester.semesterId;
   const btn = document.getElementById('btn-confirm-enroll');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Enrolling…'; }
   await new Promise(r => requestAnimationFrame(r));
@@ -1271,7 +1342,7 @@ async function saveEnrollment() {
         programId:  document.getElementById('enr-app-program').value,
         yearLevel:  parseInt(document.getElementById('enr-app-year').value),
         sectionId:  document.getElementById('enr-app-section').value || null,
-        semesterId: document.getElementById('enr-app-semester').value,
+        semesterId: activeSemId,
       });
       closeModal('modal-enroll');
       // Show credentials — only available now
@@ -1289,13 +1360,26 @@ async function saveEnrollment() {
         programId:  document.getElementById('enr-program').value,
         yearLevel:  parseInt(document.getElementById('enr-year').value),
         sectionId:  document.getElementById('enr-section').value || null,
-        semesterId: document.getElementById('enr-semester').value,
+        semesterId: activeSemId,
       });
       toast('Student enrolled successfully');
       closeModal('modal-enroll'); loadEnrollment();
     }
-  } catch (e) { toast(e.message, 'error'); }
+  } catch (e) { showEnrollError(e.message); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Confirm Enrollment'; } }
+}
+
+function showEnrollError(msg) {
+  const banner = document.getElementById('enroll-error-banner');
+  document.getElementById('enroll-error-text').textContent = msg;
+  banner.style.display = 'flex';
+  banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearEnrollError() {
+  const banner = document.getElementById('enroll-error-banner');
+  banner.style.display = 'none';
+  document.getElementById('enroll-error-text').textContent = '';
 }
 
 function editGrade(id, student, course, mtCS, mtExam, fnCS, fnExam, mtGrade, fnGrade, status, remarks) {
@@ -1375,15 +1459,31 @@ function recomputeGradeModal() {
 }
 
 function openCourseModal(courseIdOrNull) {
-  const c = courseIdOrNull ? _courseMap[courseIdOrNull] : null;
-  document.getElementById('co-id').value        = c?.courseId       || '';
-  document.getElementById('co-code').value      = c?.courseCode     || '';
-  document.getElementById('co-name').value      = c?.courseName     || '';
-  document.getElementById('co-units').value     = c?.units          || '';
-  document.getElementById('co-program').value   = c?.program?.programId || 'PRG-1001';
-  document.getElementById('co-year').value      = c?.yearLevel      || '1';
-  document.getElementById('co-sem').value       = c?.semesterNumber || '1';
+  const c         = courseIdOrNull ? _courseMap[courseIdOrNull] : null;
+  const programId = c?.program?.programId || 'PRG-1001';
+
+  document.getElementById('co-id').value      = c?.courseId  || '';
+  document.getElementById('co-code').value    = c?.courseCode || '';
+  document.getElementById('co-name').value    = c?.courseName || '';
+  document.getElementById('co-units').value   = c?.units      || '';
+  document.getElementById('co-program').value = programId;
+  document.getElementById('co-year').value    = c?.yearLevel      || '1';
+  document.getElementById('co-sem').value     = c?.semesterNumber || '1';
   document.getElementById('co-modal-title').textContent = c ? 'Edit Course' : 'Add Course';
+
+  // Populate the prerequisite dropdown with all other courses in this curriculum
+  const allCourses   = _currCourses[programId] || [];
+  const prereqSelect = document.getElementById('co-prereq');
+  prereqSelect.innerHTML = '<option value="">None</option>' +
+    allCourses
+      .filter(x => x.courseId !== courseIdOrNull)
+      .map(x => `<option value="${escHtml(x.courseId)}">${escHtml(x.courseCode)} — ${escHtml(x.courseName)}</option>`)
+      .join('');
+
+  // Re-select the existing prerequisite when editing
+  const existingPrereq = c?.prerequisites?.[0]?.prerequisiteCourse?.courseId || '';
+  prereqSelect.value = existingPrereq;
+
   openModal('modal-course');
 }
 
@@ -1396,13 +1496,47 @@ async function saveCourse() {
     {id:'co-year',    label:'Year Level'},
     {id:'co-sem',     label:'Semester Number'},
   ])) return;
-  const id      = document.getElementById('co-id').value;
-  const programId = document.getElementById('co-program').value;
+
+  const id         = document.getElementById('co-id').value;
+  const programId  = document.getElementById('co-program').value;
+  const courseCode = document.getElementById('co-code').value.trim();
+  const unitsRaw   = document.getElementById('co-units').value;
+
+  // Gap 2: course code must be ≤30 chars and contain no leading/trailing spaces
+  if (courseCode.length > 30) {
+    toast('Course Code must be 30 characters or fewer', 'error');
+    document.getElementById('co-code').focus();
+    return;
+  }
+
+  // Gap 1: units must be a whole positive number
+  const units = Number(unitsRaw);
+  if (!Number.isInteger(units) || units < 1) {
+    toast('Units must be a whole number of at least 1', 'error');
+    document.getElementById('co-units').focus();
+    return;
+  }
+
+  // Gap 4: duplicate course code check within the same curriculum (only on Add)
+  if (!id) {
+    const curriculumId = _selectedCurriculum[programId];
+    const existing = (_currCourses[programId] || []).find(
+      x => x.courseCode.trim().toLowerCase() === courseCode.toLowerCase()
+    );
+    if (existing) {
+      toast(`Course code "${courseCode}" already exists in this curriculum`, 'error');
+      document.getElementById('co-code').focus();
+      return;
+    }
+  }
+
+  const curriculumId = _selectedCurriculum[programId];
   const payload = {
-    courseCode:     document.getElementById('co-code').value,
-    courseName:     document.getElementById('co-name').value,
-    units:          parseInt(document.getElementById('co-units').value),
+    courseCode,
+    courseName:     document.getElementById('co-name').value.trim(),
+    units,
     program:        { programId },
+    curriculum:     curriculumId ? { curriculumId } : null,
     yearLevel:      parseInt(document.getElementById('co-year').value),
     semesterNumber: parseInt(document.getElementById('co-sem').value),
     isActive:       true,
@@ -1431,8 +1565,46 @@ async function confirmDeleteCourse() {
     await api(`/api/curriculum/courses/${id}`, 'DELETE');
     toast('Course deleted');
     closeModal('modal-course-delete');
-    loadCurriculum('PRG-1001');
-    loadCurriculum('PRG-1002');
+    // Reload courses for both programs under their currently selected curriculum
+    await loadCurriculum('PRG-1001');
+    await loadCurriculum('PRG-1002');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function openNewCurriculumModal() {
+  // Pre-select whichever program tab is currently visible
+  const activeProgramId = document.getElementById('curr-philo').style.display !== 'none'
+    ? 'PRG-1001' : 'PRG-1002';
+  const ncProgram = document.getElementById('nc-program');
+  ncProgram.value = activeProgramId;
+  _populateCopyFromDropdown(activeProgramId);
+  ncProgram.onchange = function () { _populateCopyFromDropdown(this.value); };
+  document.getElementById('nc-label').value = '';
+  openModal('modal-new-curriculum');
+}
+
+function _populateCopyFromDropdown(programId) {
+  const sel = document.getElementById('nc-copy-from');
+  sel.innerHTML = '<option value="">Start empty</option>' +
+    (_curricula[programId] || []).map(c =>
+      `<option value="${escHtml(c.curriculumId)}">${escHtml(c.label)}</option>`
+    ).join('');
+}
+
+async function saveNewCurriculum() {
+  const programId  = document.getElementById('nc-program').value;
+  const label      = document.getElementById('nc-label').value.trim();
+  const copyFromId = document.getElementById('nc-copy-from').value;
+  if (!label) { toast('Curriculum label is required', 'error'); return; }
+  try {
+    await api('/api/curriculum/curricula', 'POST', {
+      programId,
+      label,
+      copyFromCurriculumId: copyFromId || null,
+    });
+    toast('Curriculum created and set as active');
+    closeModal('modal-new-curriculum');
+    await loadCurricula(programId);
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1716,14 +1888,35 @@ async function activateSem(id) {
 
 async function saveSchoolYear() {
   if (!validateRequired([
-    {id:'sy-label', label:'Year Label'},
+    {id:'sy-label',  label:'Year Label'},
+    {id:'sem-label', label:'Semester Label'},
+    {id:'sem-start', label:'Start Date'},
+    {id:'sem-end',   label:'End Date'},
   ])) return;
+  const yearLabel = document.getElementById('sy-label').value.trim();
+  // Derive School Year ID from label: "2026-2027" → "SY-2627"
+  const parts = yearLabel.match(/(\d{4})-(\d{4})/);
+  if (!parts) { toast('Year Label must be in format e.g. 2026-2027', 'error'); return; }
+  const syId   = 'SY-' + parts[1].slice(2) + parts[2].slice(2);
+  const semNum = document.getElementById('sem-num').value;
   try {
-    await api('/api/school-years', 'POST', {
-      schoolYearId: document.getElementById('sy-id').value,
-      yearLabel:    document.getElementById('sy-label').value,
+    await api('/api/school-years', 'POST', { schoolYearId: syId, yearLabel });
+    const semId = 'SEM-' + syId.replace(/^SY-/i, '') + '-' + semNum;
+    await api('/api/school-years/semesters', 'POST', {
+      semesterId:     semId,
+      schoolYearId:   syId,
+      semesterNumber: parseInt(semNum),
+      semesterLabel:  document.getElementById('sem-label').value.trim(),
+      startDate:      document.getElementById('sem-start').value,
+      endDate:        document.getElementById('sem-end').value,
     });
-    toast('School year saved'); closeModal('modal-school-year'); loadSchoolYears();
+    toast('Semester added');
+    closeModal('modal-school-year');
+    ['sy-label','sem-label','sem-start','sem-end'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('sem-num').value = '1';
+    loadSchoolYears();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2017,18 +2210,32 @@ async function toggleCourseChecklist() {
   document.getElementById('enrs-check-all').checked = false;
 
   try {
-    const courses = await api(`/api/enrollment/${_currentEnrollmentId}/available-courses`);
-    if (!courses.length) {
+    const rawCourses = await api(`/api/enrollment/${_currentEnrollmentId}/available-courses`);
+    if (!rawCourses.length) {
       checklist.innerHTML = '<p style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:12px 0">All subjects for this year and semester are already enrolled.</p>';
       return;
     }
-    checklist.innerHTML = courses.map(c => {
+    // Sort: regular first → retake second → blocked last so registrar sees enrollable courses first
+    const typeOrder = { regular: 0, retake: 1, blocked: 2 };
+    const courses = [...rawCourses].sort((a, b) => (typeOrder[a.type] ?? 0) - (typeOrder[b.type] ?? 0));
+
+    // Show a separator before the blocked section if there are both enrollable and blocked courses
+    const hasBlocked  = courses.some(c => c.type === 'blocked');
+    const hasEnrollab = courses.some(c => c.type !== 'blocked');
+
+    checklist.innerHTML = courses.map((c, i) => {
       const id = escHtml(c.courseId);
       const units = `${escHtml(String(c.units))} unit${c.units !== 1 ? 's' : ''}`;
 
+      // Insert a divider label before the first blocked course
+      const prevType = i > 0 ? courses[i - 1].type : null;
+      const separator = (c.type === 'blocked' && prevType !== 'blocked' && hasEnrollab)
+        ? `<div style="font-size:.72rem;font-weight:600;color:var(--gray-400);letter-spacing:.04em;padding:6px 2px 2px;text-transform:uppercase">Cannot enroll — prerequisite not met</div>`
+        : '';
+
       if (c.type === 'blocked') {
         // Blocked: greyed out — checkbox disabled until registrar fills override reason (Option B)
-        return `
+        return separator + `
         <div style="border:1.5px solid var(--gray-200);border-radius:7px;overflow:hidden;opacity:.75">
           <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--gray-50);font-size:.875rem;color:var(--gray-500)">
             <input type="checkbox" class="enrs-course-cb" value="${id}" disabled

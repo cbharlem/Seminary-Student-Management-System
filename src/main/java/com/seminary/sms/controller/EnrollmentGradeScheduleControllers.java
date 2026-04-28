@@ -245,11 +245,19 @@ class EnrollmentController {
                 .map(es -> es.getCourse().getCourseId())
                 .collect(Collectors.toSet());
 
-            // Courses the student previously failed — used to flag retakes (Option A)
+            // Courses the student previously passed — exclude these entirely from the available list
+            Set<String> passedCourseIds = gradeRepository
+                .findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Passed)
+                .stream()
+                .map(g -> g.getCourse().getCourseId())
+                .collect(Collectors.toSet());
+
+            // Courses the student previously failed AND has not yet passed — flag as retakes (Option A)
             Set<String> failedCourseIds = gradeRepository
                 .findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Failed)
                 .stream()
                 .map(g -> g.getCourse().getCourseId())
+                .filter(id -> !passedCourseIds.contains(id))
                 .collect(Collectors.toSet());
 
             java.util.LinkedHashMap<String, java.util.HashMap<String, Object>> resultMap = new java.util.LinkedHashMap<>();
@@ -261,18 +269,21 @@ class EnrollmentController {
 
             for (Course c : semesterCourses) {
                 if (alreadyEnrolled.contains(c.getCourseId())) continue;
+                if (passedCourseIds.contains(c.getCourseId())) continue;
                 java.util.HashMap<String, Object> item = buildCourseItem(c, studentId, failedCourseIds);
                 resultMap.put(c.getCourseId(), item);
             }
 
-            // 2. Failed courses from other year/semester combinations (retakes not in current list)
+            // 2. Failed-but-not-yet-passed courses from other year/semester combinations (retakes)
             Set<String> semesterCourseIds = semesterCourses.stream()
                 .map(Course::getCourseId).collect(Collectors.toSet());
 
             gradeRepository.findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Failed)
                 .stream()
                 .map(Grade::getCourse)
-                .filter(c -> c.getIsActive() && !alreadyEnrolled.contains(c.getCourseId())
+                .filter(c -> c.getIsActive()
+                             && !alreadyEnrolled.contains(c.getCourseId())
+                             && !passedCourseIds.contains(c.getCourseId())
                              && !semesterCourseIds.contains(c.getCourseId()))
                 .forEach(c -> resultMap.putIfAbsent(c.getCourseId(), buildCourseItem(c, studentId, failedCourseIds)));
 

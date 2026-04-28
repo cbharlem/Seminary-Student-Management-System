@@ -50,7 +50,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.transaction.Transactional;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +66,92 @@ class CurriculumController {
     private final CourseRepository courseRepository;
     private final ProgramRepository programRepository;
     private final PrerequisiteRepository prerequisiteRepository;
+    private final CurriculumVersionRepository curriculumVersionRepository;
+    private final EnrollmentSubjectRepository enrollmentSubjectRepository;
+    private final GradeRepository gradeRepository;
+    private final ScheduleRepository scheduleRepository;
+
+    // LAYER 1 → LAYER 2: Called by app.js loadCurricula() to populate the version selector dropdown
+    // LAYER 2 → LAYER 4: Fetches all curriculum versions for a program, newest first
+    // LAYER 2 → LAYER 1: Returns a JSON list of Curriculum objects with isActive flag
+    @GetMapping("/curricula")
+    @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
+    public List<Curriculum> getCurricula(@RequestParam(required = false) String program) {
+        return program != null
+            ? curriculumVersionRepository.findByProgram_ProgramIdOrderByCreatedAtDesc(program)
+            : curriculumVersionRepository.findAll();
+    }
+
+    // LAYER 1 → LAYER 2: Called by app.js saveNewCurriculum() when registrar creates a new curriculum version
+    // LAYER 2 → LAYER 4: Deactivates the current active curriculum, creates the new one, and optionally
+    //   copies all courses and prerequisites from a source curriculum into the new one.
+    // LAYER 2 → LAYER 1: Returns the newly created Curriculum JSON
+    @PostMapping("/curricula")
+    @PreAuthorize("hasRole('Registrar')")
+    @Transactional
+    public ResponseEntity<Curriculum> createCurriculum(@RequestBody Map<String, String> body) {
+        String programId  = body.get("programId");
+        String label      = body.get("label");
+        String copyFromId = body.get("copyFromCurriculumId");
+
+        Program program = programRepository.findByProgramId(programId).orElseThrow();
+
+        // Deactivate the currently active curriculum for this program
+        curriculumVersionRepository.findByProgram_ProgramIdAndIsActiveTrue(programId)
+            .ifPresent(cur -> { cur.setIsActive(false); curriculumVersionRepository.save(cur); });
+
+        // Create new curriculum, mark as active
+        long seq = curriculumVersionRepository.count() + 1;
+        Curriculum newCur = Curriculum.builder()
+            .curriculumId("CUR-" + String.format("%03d", seq))
+            .program(program)
+            .label(label)
+            .isActive(true)
+            .build();
+        curriculumVersionRepository.save(newCur);
+
+        // Optionally copy all courses + prerequisite links from the source curriculum
+        if (copyFromId != null && !copyFromId.isBlank()) {
+            List<Course> sourceCourses = courseRepository.findByCurriculum_CurriculumId(copyFromId);
+            Map<String, String> oldToNewId = new HashMap<>();
+
+            for (Course src : sourceCourses) {
+                long cseq = courseRepository.count() + 1;
+                String newCourseId = "CRS" + String.format("%03d", cseq);
+                Course copy = Course.builder()
+                    .courseId(newCourseId)
+                    .courseCode(src.getCourseCode())
+                    .courseName(src.getCourseName())
+                    .units(src.getUnits())
+                    .program(program)
+                    .curriculum(newCur)
+                    .yearLevel(src.getYearLevel())
+                    .semesterNumber(src.getSemesterNumber())
+                    .isActive(true)
+                    .build();
+                courseRepository.save(copy);
+                oldToNewId.put(src.getCourseId(), newCourseId);
+            }
+
+            // Re-create prerequisite links using the new course IDs
+            for (Course src : sourceCourses) {
+                List<Prerequisite> prereqs = prerequisiteRepository.findByCourse_CourseId(src.getCourseId());
+                for (Prerequisite p : prereqs) {
+                    String newCourseId = oldToNewId.get(src.getCourseId());
+                    String newPrereqId = p.getPrerequisiteCourse() != null
+                        ? oldToNewId.get(p.getPrerequisiteCourse().getCourseId()) : null;
+                    if (newCourseId == null || newPrereqId == null) continue;
+                    Prerequisite np = new Prerequisite();
+                    np.setPrerequisiteId("PRE-" + System.currentTimeMillis() + "-" + newPrereqId);
+                    courseRepository.findByCourseId(newCourseId).ifPresent(np::setCourse);
+                    courseRepository.findByCourseId(newPrereqId).ifPresent(np::setPrerequisiteCourse);
+                    prerequisiteRepository.save(np);
+                }
+            }
+        }
+
+        return ResponseEntity.ok(newCur);
+    }
 
     // LAYER 1 → LAYER 2: Triggered by app.js when dropdowns or the curriculum page need the list of active programs
     // LAYER 2 → LAYER 4: Calls programRepository.findByIsActiveTrue() — no service needed here
@@ -75,13 +163,32 @@ class CurriculumController {
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadCurriculum() to fill the curriculum table
-    // LAYER 2 → LAYER 4: Calls courseRepository filtered by program and active status
-    // LAYER 2 → LAYER 1: Returns a JSON list of Course objects matching the filter
+    // LAYER 2 → LAYER 4: Fetches courses, then attaches each course's prerequisite list so the
+    //   frontend can display them without a second round-trip.
+    // LAYER 2 → LAYER 1: Returns a JSON list of course maps, each containing a 'prerequisites' array
     @GetMapping("/courses")
     @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
-    public List<Course> getCourses(@RequestParam(required = false) String program) {
-        if (program != null) return courseRepository.findByProgram_ProgramIdAndIsActiveTrue(program);
-        return courseRepository.findByIsActiveTrue();
+    public List<Map<String, Object>> getCourses(
+            @RequestParam(required = false) String program,
+            @RequestParam(required = false) String curriculum) {
+        List<Course> courses = curriculum != null
+            ? courseRepository.findByCurriculum_CurriculumIdAndIsActiveTrue(curriculum)
+            : program != null
+                ? courseRepository.findByProgram_ProgramIdAndIsActiveTrue(program)
+                : courseRepository.findByIsActiveTrue();
+        return courses.stream().map(c -> {
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("courseId",      c.getCourseId());
+            item.put("courseCode",    c.getCourseCode());
+            item.put("courseName",    c.getCourseName());
+            item.put("units",         c.getUnits());
+            item.put("yearLevel",     c.getYearLevel());
+            item.put("semesterNumber",c.getSemesterNumber());
+            item.put("isActive",      c.getIsActive());
+            item.put("program",       c.getProgram());
+            item.put("prerequisites", prerequisiteRepository.findByCourse_CourseId(c.getCourseId()));
+            return item;
+        }).toList();
     }
 
     // LAYER 1 → LAYER 2: Called when displaying a course's prerequisite rules in the curriculum table
@@ -102,6 +209,9 @@ class CurriculumController {
         course.setCourseId("CRS" + String.format("%03d", 1 + courseRepository.count()));
         if (course.getProgram() != null && course.getProgram().getProgramId() != null)
             programRepository.findByProgramId(course.getProgram().getProgramId()).ifPresent(course::setProgram);
+        if (course.getCurriculum() != null && course.getCurriculum().getCurriculumId() != null)
+            curriculumVersionRepository.findByCurriculumId(course.getCurriculum().getCurriculumId())
+                .ifPresent(course::setCurriculum);
         return ResponseEntity.ok(courseRepository.save(course));
     }
 
@@ -110,9 +220,29 @@ class CurriculumController {
     // LAYER 2 → LAYER 1: Returns the updated Course JSON, or 404 if not found
     @PutMapping("/courses/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Course> updateCourse(@PathVariable String id, @RequestBody Course course) {
+    public ResponseEntity<?> updateCourse(@PathVariable String id, @RequestBody Course course) {
         Course existing = courseRepository.findByCourseId(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
+
+        // Block year level or semester changes if the course is already referenced in
+        // enrollments, grades, or schedules — changing those fields would corrupt existing records.
+        boolean yearLevelChanging   = course.getYearLevel()      != null && !course.getYearLevel().equals(existing.getYearLevel());
+        boolean semesterChanging    = course.getSemesterNumber()  != null && !course.getSemesterNumber().equals(existing.getSemesterNumber());
+        if (yearLevelChanging || semesterChanging) {
+            boolean hasEnrollments = enrollmentSubjectRepository.existsByCourse_CourseId(id);
+            boolean hasGrades      = gradeRepository.existsByCourse_CourseId(id);
+            boolean hasSchedules   = scheduleRepository.existsByCourse_CourseId(id);
+            if (hasEnrollments || hasGrades || hasSchedules) {
+                List<String> affected = new java.util.ArrayList<>();
+                if (hasEnrollments) affected.add("student enrollments");
+                if (hasGrades)      affected.add("grade records");
+                if (hasSchedules)   affected.add("schedule entries");
+                return ResponseEntity.status(409).body(Map.of("error",
+                    "Year level and semester cannot be changed — this course has existing " +
+                    String.join(", ", affected) + ". Create a new curriculum version to restructure courses."));
+            }
+        }
+
         if (course.getCourseCode()     != null) existing.setCourseCode(course.getCourseCode());
         if (course.getCourseName()     != null) existing.setCourseName(course.getCourseName());
         if (course.getUnits()          != null) existing.setUnits(course.getUnits());
@@ -524,12 +654,23 @@ class SchoolYearController {
         return ResponseEntity.ok(semesterRepository.save(sem));
     }
 
-    // LAYER 1 → LAYER 2: Triggered by app.js when the registrar adds a new semester record
-    // LAYER 2 → LAYER 4: Calls semesterRepository.save() directly
+    // LAYER 1 → LAYER 2: Triggered by app.js saveSchoolYear() when creating a new semester
+    // LAYER 2 → LAYER 4: Resolves the SchoolYear FK by schoolYearId, then saves the Semester
     // LAYER 2 → LAYER 1: Returns the saved Semester JSON
     @PostMapping("/semesters")
     @PreAuthorize("hasRole('Admin')")
-    public ResponseEntity<Semester> createSemester(@RequestBody Semester semester) {
+    public ResponseEntity<Semester> createSemester(@RequestBody Map<String, Object> body) {
+        String schoolYearId = (String) body.get("schoolYearId");
+        SchoolYear sy = schoolYearRepository.findBySchoolYearId(schoolYearId)
+            .orElseThrow(() -> new RuntimeException("School year not found: " + schoolYearId));
+        Semester semester = new Semester();
+        semester.setSemesterId((String) body.get("semesterId"));
+        semester.setSchoolYear(sy);
+        semester.setSemesterNumber(Integer.parseInt(body.get("semesterNumber").toString()));
+        semester.setSemesterLabel((String) body.get("semesterLabel"));
+        semester.setStartDate(LocalDate.parse((String) body.get("startDate")));
+        semester.setEndDate(LocalDate.parse((String) body.get("endDate")));
+        semester.setIsActive(false);
         return ResponseEntity.ok(semesterRepository.save(semester));
     }
 }

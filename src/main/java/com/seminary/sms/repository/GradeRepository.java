@@ -67,4 +67,8 @@ public interface GradeRepository extends JpaRepository<Grade, Integer> {
     // Auto-generates: JOIN tblstudents ... WHERE fldStudentID = ? AND fldGradeStatus = ?
     // Called by: EnrollmentController.getAvailableCourses() to identify courses the student must retake
     List<Grade> findByStudent_StudentIdAndGradeStatus(String studentId, Grade.GradeStatus gradeStatus);
+
+    // Auto-generates: SELECT COUNT(*) > 0 ... JOIN tblcourses WHERE fldCourseID = ?
+    // Called by: CurriculumController.updateCourse() to block structural edits to graded courses
+    boolean existsByCourse_CourseId(String courseId);
 }

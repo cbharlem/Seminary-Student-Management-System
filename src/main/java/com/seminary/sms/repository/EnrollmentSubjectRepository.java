@@ -30,4 +30,8 @@ public interface EnrollmentSubjectRepository extends JpaRepository<EnrollmentSub
     // Auto-generates: JOIN tblenrollment ON ... JOIN tblstudents ON ... WHERE tblstudents.fldIndex = ?
     // Called by: GradeService to get all subjects a student has ever enrolled in across all semesters
     List<EnrollmentSubject> findByEnrollment_Student_Index(Integer studentIndex);
+
+    // Auto-generates: SELECT COUNT(*) > 0 ... JOIN tblcourses WHERE fldCourseID = ?
+    // Called by: CurriculumController.updateCourse() to block structural edits to enrolled courses
+    boolean existsByCourse_CourseId(String courseId);
 }

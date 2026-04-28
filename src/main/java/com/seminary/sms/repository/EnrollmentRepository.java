@@ -53,4 +53,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
     // Auto-generates: JOIN tblstudents ON ... WHERE tblstudents.fldStudentID = ?
     // Called by: EnrollmentController.getByStudent() to list a student's full enrollment history
     List<Enrollment> findByStudent_StudentId(String studentId);
+
+    // Auto-generates: JOIN tblstudents ON ... WHERE fldStudentID = ? AND fldYearLevel = ?
+    // Called by: EnrollmentService.enroll() to check if a student already completed a given year level
+    List<Enrollment> findByStudent_StudentIdAndYearLevel(String studentId, Integer yearLevel);
 }

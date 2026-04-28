@@ -83,4 +83,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     // Called by: ScheduleService.update() to allow saving a schedule to the same slot it already occupies
     @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
     List<Schedule> findConflictsByInstructorExcluding(@Param("instructorId") String instructorId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+
+    // Auto-generates: SELECT COUNT(*) > 0 ... JOIN tblcourses WHERE fldCourseID = ?
+    // Called by: CurriculumController.updateCourse() to block structural edits to scheduled courses
+    boolean existsByCourse_CourseId(String courseId);
 }

@@ -51,4 +51,12 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     // Called by: available-courses endpoint to show only courses for the student's year and semester
     List<Course> findByProgram_ProgramIdAndYearLevelAndSemesterNumberAndIsActiveTrue(
         String programId, Integer yearLevel, Integer semesterNumber);
+
+    // Auto-generates: JOIN tblcurriculum WHERE fldCurriculumID = ? AND fldIsActive = 1
+    // Called by: getCourses() when filtering by a specific curriculum version
+    List<Course> findByCurriculum_CurriculumIdAndIsActiveTrue(String curriculumId);
+
+    // Auto-generates: JOIN tblcurriculum WHERE fldCurriculumID = ?  (includes inactive courses)
+    // Called by: createCurriculum() copy-from logic to duplicate all courses to a new curriculum
+    List<Course> findByCurriculum_CurriculumId(String curriculumId);
 }
