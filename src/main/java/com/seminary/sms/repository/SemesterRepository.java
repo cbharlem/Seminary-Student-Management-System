@@ -41,4 +41,7 @@ public interface SemesterRepository extends JpaRepository<Semester, Integer> {
     // Called by: PublicController.getActiveSemester() to show the active semester label on the login page
     @Query("SELECT s FROM Semester s JOIN FETCH s.schoolYear WHERE s.isActive = true")
     Optional<Semester> findActiveWithSchoolYear();
+
+    // Returns all semesters ordered by school year (ascending) then semester number (ascending)
+    List<Semester> findAllByOrderBySchoolYear_IndexAscSemesterNumberAsc();
 }

@@ -623,7 +623,7 @@ class SchoolYearController {
     @GetMapping("/semesters")
     @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Semester> getSemesters() {
-        return semesterRepository.findAll();
+        return semesterRepository.findAllByOrderBySchoolYear_IndexAscSemesterNumberAsc();
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js init() to load the current active semester label in the header
