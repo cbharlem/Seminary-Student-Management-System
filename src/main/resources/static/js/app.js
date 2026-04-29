@@ -816,15 +816,73 @@ async function loadSchoolYears() {
   try {
     const data = await api('/api/school-years/semesters');
     const tbody = document.getElementById('tbl-semesters');
-    tbody.innerHTML = data.map(s =>
-      `<tr>
-        <td>${s.semesterId}</td><td>${s.semesterLabel}</td>
-        <td>${fmtDate(s.startDate)}</td><td>${fmtDate(s.endDate)}</td>
-        <td>${badge(s.isActive ? 'Active' : 'Inactive', s.isActive ? 'success' : 'gray')}</td>
-        <td>${!s.isActive ? `<button class="btn btn-success btn-sm" onclick="activateSem('${s.semesterId}')">Set Active</button>` : '<span style="color:var(--gray-400);font-size:.8rem">Current</span>'}</td>
-      </tr>`
-    ).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--gray-400)">No semesters found</td></tr>';
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray-400)">No semesters found</td></tr>';
+      return;
+    }
+
+    // Group semesters by school year
+    const groups = {};
+    data.forEach(s => {
+      const key = s.schoolYear?.yearLabel || 'Unknown';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    });
+
+    tbody.innerHTML = Object.entries(groups).map(([yearLabel, sems]) => {
+      const groupHeader = `<tr>
+        <td colspan="5" style="background:var(--gray-50);padding:8px 14px;font-weight:700;font-size:.8rem;color:var(--navy);letter-spacing:.03em;border-bottom:1px solid var(--gray-200)">${yearLabel}</td>
+      </tr>`;
+      const rows = sems.map(s => {
+        const sd = JSON.stringify(s).replace(/'/g, '&#39;');
+        const semLabel = s.semesterNumber === 1 ? '1st Semester' : s.semesterNumber === 2 ? '2nd Semester' : 'Summer';
+        const editBtn  = `<button class="btn btn-outline btn-sm" onclick='openEditSemModal(${sd})'>Edit</button>`;
+        const activeBtn = !s.isActive
+          ? `<button class="btn btn-success btn-sm" onclick="activateSem('${s.semesterId}')">Set Active</button>`
+          : '<span style="color:var(--gray-400);font-size:.8rem">★ Current</span>';
+        return `<tr>
+          <td style="padding-left:24px">${semLabel}</td>
+          <td>${fmtDate(s.startDate)}</td>
+          <td>${fmtDate(s.endDate)}</td>
+          <td>${badge(s.isActive ? 'Active' : 'Inactive', s.isActive ? 'success' : 'gray')}</td>
+          <td style="display:flex;gap:6px;align-items:center">${editBtn}${activeBtn}</td>
+        </tr>`;
+      }).join('');
+      return groupHeader + rows;
+    }).join('');
   } catch (e) { console.error(e); }
+}
+
+function openEditSemModal(s) {
+  document.getElementById('sem-id').value    = s.semesterId;
+  document.getElementById('sy-label').value  = s.schoolYear?.yearLabel || '';
+  document.getElementById('sy-label').readOnly = true;
+  document.getElementById('sy-label').style.opacity = '.5';
+  document.getElementById('sem-num').value   = s.semesterNumber;
+  document.getElementById('sem-start').value = s.startDate;
+  document.getElementById('sem-end').value   = s.endDate;
+  document.getElementById('sy-modal').classList.add('editing');
+  document.querySelector('#sy-modal .edit-mode-banner').style.display = '';
+  document.getElementById('sy-modal-title').textContent = s.semesterLabel;
+  document.getElementById('sy-modal-sub').textContent   = s.semesterId;
+  document.getElementById('sy-save-btn').textContent    = 'Save Changes';
+  openModal('modal-school-year');
+}
+
+function closeSemModal() {
+  document.getElementById('sem-id').value    = '';
+  document.getElementById('sy-label').value  = '';
+  document.getElementById('sy-label').readOnly = false;
+  document.getElementById('sy-label').style.opacity = '';
+  document.getElementById('sem-start').value = '';
+  document.getElementById('sem-end').value   = '';
+  document.getElementById('sem-num').value   = '1';
+  document.getElementById('sy-modal').classList.remove('editing');
+  document.querySelector('#sy-modal .edit-mode-banner').style.display = 'none';
+  document.getElementById('sy-modal-title').textContent = 'Add Semester';
+  document.getElementById('sy-modal-sub').textContent   = 'Create a new school year and semester';
+  document.getElementById('sy-save-btn').textContent    = 'Save';
+  closeModal('modal-school-year');
 }
 
 async function loadBackup() {
@@ -1889,33 +1947,40 @@ async function activateSem(id) {
 async function saveSchoolYear() {
   if (!validateRequired([
     {id:'sy-label',  label:'Year Label'},
-    {id:'sem-label', label:'Semester Label'},
     {id:'sem-start', label:'Start Date'},
     {id:'sem-end',   label:'End Date'},
   ])) return;
-  const yearLabel = document.getElementById('sy-label').value.trim();
-  // Derive School Year ID from label: "2026-2027" → "SY-2627"
-  const parts = yearLabel.match(/(\d{4})-(\d{4})/);
-  if (!parts) { toast('Year Label must be in format e.g. 2026-2027', 'error'); return; }
-  const syId   = 'SY-' + parts[1].slice(2) + parts[2].slice(2);
-  const semNum = document.getElementById('sem-num').value;
+  const yearLabel  = document.getElementById('sy-label').value.trim();
+  const semNum     = document.getElementById('sem-num').value;
+  const existingId = document.getElementById('sem-id').value.trim();
+  const startDate  = document.getElementById('sem-start').value;
+  const endDate    = document.getElementById('sem-end').value;
+
+  // Auto-generate semester label from year + semester number
+  const semNumNames = { '1': 'First', '2': 'Second', '3': 'Summer' };
+  const semLabel = semNum === '3'
+    ? `Summer ${yearLabel}`
+    : `${semNumNames[semNum]} Semester ${yearLabel}`;
+
   try {
-    await api('/api/school-years', 'POST', { schoolYearId: syId, yearLabel });
-    const semId = 'SEM-' + syId.replace(/^SY-/i, '') + '-' + semNum;
-    await api('/api/school-years/semesters', 'POST', {
-      semesterId:     semId,
-      schoolYearId:   syId,
-      semesterNumber: parseInt(semNum),
-      semesterLabel:  document.getElementById('sem-label').value.trim(),
-      startDate:      document.getElementById('sem-start').value,
-      endDate:        document.getElementById('sem-end').value,
-    });
-    toast('Semester added');
-    closeModal('modal-school-year');
-    ['sy-label','sem-label','sem-start','sem-end'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    document.getElementById('sem-num').value = '1';
+    if (existingId) {
+      await api(`/api/school-years/semesters/${existingId}`, 'PUT', {
+        semesterLabel: semLabel, semesterNumber: parseInt(semNum), startDate, endDate,
+      });
+      toast('Semester updated');
+    } else {
+      const parts = yearLabel.match(/(\d{4})-(\d{4})/);
+      if (!parts) { toast('Year Label must be in format e.g. 2026-2027', 'error'); return; }
+      const syId  = 'SY-' + parts[1].slice(2) + parts[2].slice(2);
+      try { await api('/api/school-years', 'POST', { schoolYearId: syId, yearLabel }); } catch (_) {}
+      const semId = 'SEM-' + syId.replace(/^SY-/i, '') + '-' + semNum;
+      await api('/api/school-years/semesters', 'POST', {
+        semesterId: semId, schoolYearId: syId,
+        semesterNumber: parseInt(semNum), semesterLabel: semLabel, startDate, endDate,
+      });
+      toast('Semester added');
+    }
+    closeSemModal();
     loadSchoolYears();
   } catch (e) { toast(e.message, 'error'); }
 }

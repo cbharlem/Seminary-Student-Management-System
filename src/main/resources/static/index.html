@@ -558,7 +558,7 @@
     <button class="btn btn-primary" onclick="openModal('modal-school-year')">+ Add Semester</button>
   </div>
   <div class="card"><div class="card-header"><h3>Semesters</h3></div>
-    <div class="card-body"><table><thead><tr><th>Semester ID</th><th>Label</th><th>Start</th><th>End</th><th>Active</th><th>Actions</th></tr></thead><tbody id="tbl-semesters"></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>Semester</th><th>Start</th><th>End</th><th>Active</th><th>Actions</th></tr></thead><tbody id="tbl-semesters"></tbody></table></div>
   </div>
 </div>
 
@@ -1348,18 +1348,20 @@
 
 <!-- School Year -->
 <div class="modal-overlay" id="modal-school-year">
-  <div class="modal">
-    <h3>Add Semester</h3><p class="modal-sub">Create a new school year and semester</p>
+  <div class="modal" id="sy-modal">
+    <div class="edit-mode-banner" style="display:none">Editing Semester</div>
+    <h3 id="sy-modal-title">Add Semester</h3>
+    <p class="modal-sub" id="sy-modal-sub">Create a new school year and semester</p>
+    <input type="hidden" id="sem-id"/>
     <div class="modal-grid">
       <div class="field full"><label for="sy-label">Year Label</label><input id="sy-label" placeholder="e.g. 2026-2027"/></div>
-      <div class="field full"><label for="sem-label">Semester Label</label><input id="sem-label" placeholder="e.g. First Semester 2026-2027"/></div>
       <div class="field"><label for="sem-num">Semester Number</label><select id="sem-num"><option value="1">1st Semester</option><option value="2">2nd Semester</option><option value="3">Summer</option></select></div>
       <div class="field"><label for="sem-start">Start Date</label><input id="sem-start" type="date"/></div>
       <div class="field full"><label for="sem-end">End Date</label><input id="sem-end" type="date"/></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('modal-school-year')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSchoolYear()">Save</button>
+      <button class="btn btn-outline" onclick="closeSemModal()">Cancel</button>
+      <button class="btn btn-primary" id="sy-save-btn" onclick="saveSchoolYear()">Save</button>
     </div>
   </div>
 </div>

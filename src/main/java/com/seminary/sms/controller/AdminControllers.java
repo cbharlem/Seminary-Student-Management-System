@@ -673,6 +673,18 @@ class SchoolYearController {
         semester.setIsActive(false);
         return ResponseEntity.ok(semesterRepository.save(semester));
     }
+
+    @PutMapping("/semesters/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<?> updateSemester(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        Semester sem = semesterRepository.findBySemesterId(id)
+            .orElseThrow(() -> new RuntimeException("Semester not found: " + id));
+        if (body.containsKey("semesterLabel"))  sem.setSemesterLabel((String) body.get("semesterLabel"));
+        if (body.containsKey("semesterNumber")) sem.setSemesterNumber(Integer.parseInt(body.get("semesterNumber").toString()));
+        if (body.containsKey("startDate"))      sem.setStartDate(LocalDate.parse((String) body.get("startDate")));
+        if (body.containsKey("endDate"))        sem.setEndDate(LocalDate.parse((String) body.get("endDate")));
+        return ResponseEntity.ok(semesterRepository.save(sem));
+    }
 }
 
 // ── Public (no auth) ──────────────────────────────────────────────────────────
