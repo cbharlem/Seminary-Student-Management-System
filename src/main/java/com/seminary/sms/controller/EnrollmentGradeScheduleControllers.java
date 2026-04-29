@@ -58,6 +58,7 @@ class EnrollmentController {
     private final SectionRepository sectionRepository;
     private final CourseRepository courseRepository;
     private final GradeRepository gradeRepository;
+    private final PrerequisiteRepository prerequisiteRepository;
     private final AuditService auditService;
     private final ApplicantRepository applicantRepository;
     private final ApplicationRepository applicationRepository;
@@ -223,9 +224,10 @@ class EnrollmentController {
 
     // Returns available courses for this enrollment's program/year/semester.
     // Each item includes a 'type' field:
-    //   "regular" — new course, prerequisites met
-    //   "retake"  — student previously failed this course, prerequisites met (Option A)
-    //   "blocked" — prerequisites not met; includes 'blockedReason' (can be overridden, Option B)
+    //   "regular" — new course for current year/sem, prerequisites met
+    //   "retake"  — student previously failed this course (same semester number), prerequisites met
+    //   "makeup"  — course from a prior year the student never took, same semester number, prerequisites met
+    //   "blocked" — prerequisites not met; includes 'blockedReason' (can be overridden)
     @GetMapping("/{enrollmentId}/available-courses")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> getAvailableCourses(@PathVariable String enrollmentId) {
@@ -233,26 +235,26 @@ class EnrollmentController {
             Enrollment enrollment = enrollmentRepository.findByEnrollmentId(enrollmentId)
                 .orElseThrow(() -> new RuntimeException("Enrollment not found"));
 
-            String studentId      = enrollment.getStudent().getStudentId();
-            String programId      = enrollment.getProgram().getProgramId();
-            Integer yearLevel     = enrollment.getYearLevel();
+            String studentId       = enrollment.getStudent().getStudentId();
+            String programId       = enrollment.getProgram().getProgramId();
+            Integer yearLevel      = enrollment.getYearLevel();
             Integer semesterNumber = enrollment.getSemester().getSemesterNumber();
 
-            // Courses already enrolled in this semester (non-dropped) — exclude from checklist
+            // Courses already enrolled in this enrollment (non-dropped) — used for exclusion and in-progress prereq check
             Set<String> alreadyEnrolled = enrollmentService.getSubjectsByEnrollment(enrollmentId)
                 .stream()
                 .filter(es -> es.getStatus() != EnrollmentSubject.SubjectStatus.Dropped)
                 .map(es -> es.getCourse().getCourseId())
                 .collect(Collectors.toSet());
 
-            // Courses the student previously passed — exclude these entirely from the available list
+            // Courses the student previously passed — exclude these entirely
             Set<String> passedCourseIds = gradeRepository
                 .findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Passed)
                 .stream()
                 .map(g -> g.getCourse().getCourseId())
                 .collect(Collectors.toSet());
 
-            // Courses the student previously failed AND has not yet passed — flag as retakes (Option A)
+            // Courses the student previously failed AND has not yet passed — flag as retakes
             Set<String> failedCourseIds = gradeRepository
                 .findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Failed)
                 .stream()
@@ -270,22 +272,40 @@ class EnrollmentController {
             for (Course c : semesterCourses) {
                 if (alreadyEnrolled.contains(c.getCourseId())) continue;
                 if (passedCourseIds.contains(c.getCourseId())) continue;
-                java.util.HashMap<String, Object> item = buildCourseItem(c, studentId, failedCourseIds);
-                resultMap.put(c.getCourseId(), item);
+                resultMap.put(c.getCourseId(), buildCourseItem(c, studentId, failedCourseIds, alreadyEnrolled, "regular"));
             }
 
-            // 2. Failed-but-not-yet-passed courses from other year/semester combinations (retakes)
             Set<String> semesterCourseIds = semesterCourses.stream()
                 .map(Course::getCourseId).collect(Collectors.toSet());
 
+            // 2. Retakes — failed courses from a prior year, but only shown during the matching semester number.
+            //    e.g. a course that belongs to 1st Sem only appears as a retake during a 1st Sem enrollment.
             gradeRepository.findByStudent_StudentIdAndGradeStatus(studentId, Grade.GradeStatus.Failed)
                 .stream()
                 .map(Grade::getCourse)
                 .filter(c -> c.getIsActive()
+                             && c.getSemesterNumber().equals(semesterNumber)
                              && !alreadyEnrolled.contains(c.getCourseId())
                              && !passedCourseIds.contains(c.getCourseId())
                              && !semesterCourseIds.contains(c.getCourseId()))
-                .forEach(c -> resultMap.putIfAbsent(c.getCourseId(), buildCourseItem(c, studentId, failedCourseIds)));
+                .forEach(c -> resultMap.putIfAbsent(c.getCourseId(),
+                    buildCourseItem(c, studentId, failedCourseIds, alreadyEnrolled, "retake")));
+
+            // 3. Makeup courses — from prior year levels, same semester number, never taken by the student.
+            //    Handles irregular students who missed or skipped a semester in a previous year.
+            Set<String> everTakenCourseIds = new java.util.HashSet<>();
+            everTakenCourseIds.addAll(passedCourseIds);
+            everTakenCourseIds.addAll(failedCourseIds);
+            everTakenCourseIds.addAll(alreadyEnrolled);
+
+            courseRepository.findByProgram_ProgramIdAndIsActiveTrue(programId)
+                .stream()
+                .filter(c -> c.getYearLevel() < yearLevel
+                             && c.getSemesterNumber().equals(semesterNumber)
+                             && !everTakenCourseIds.contains(c.getCourseId())
+                             && !semesterCourseIds.contains(c.getCourseId()))
+                .forEach(c -> resultMap.putIfAbsent(c.getCourseId(),
+                    buildCourseItem(c, studentId, failedCourseIds, alreadyEnrolled, "makeup")));
 
             return ResponseEntity.ok(resultMap.values());
         } catch (RuntimeException e) {
@@ -293,7 +313,8 @@ class EnrollmentController {
         }
     }
 
-    private java.util.HashMap<String, Object> buildCourseItem(Course c, String studentId, Set<String> failedCourseIds) {
+    private java.util.HashMap<String, Object> buildCourseItem(Course c, String studentId,
+            Set<String> failedCourseIds, Set<String> inProgressCourseIds, String defaultType) {
         List<String> unmet = enrollmentService.checkPrerequisites(studentId, c.getCourseId());
         java.util.HashMap<String, Object> item = new java.util.HashMap<>();
         item.put("courseId",   c.getCourseId());
@@ -301,10 +322,23 @@ class EnrollmentController {
         item.put("courseName", c.getCourseName());
         item.put("units",      c.getUnits());
         if (!unmet.isEmpty()) {
-            item.put("type", "blocked");
-            item.put("blockedReason", "Requires: " + String.join(", ", unmet));
+            // Check if any unmet prereq is being taken in this same enrollment (scheduling conflict)
+            List<String> inProgressPrereqCodes = prerequisiteRepository
+                .findByCourse_CourseId(c.getCourseId())
+                .stream()
+                .filter(p -> inProgressCourseIds.contains(p.getPrerequisiteCourse().getCourseId()))
+                .map(p -> p.getPrerequisiteCourse().getCourseCode())
+                .collect(Collectors.toList());
+            if (!inProgressPrereqCodes.isEmpty()) {
+                item.put("type", "blocked");
+                item.put("blockedReason", "Prerequisite currently being taken this semester ("
+                    + String.join(", ", inProgressPrereqCodes) + ")");
+            } else {
+                item.put("type", "blocked");
+                item.put("blockedReason", "Requires: " + String.join(", ", unmet));
+            }
         } else {
-            item.put("type", failedCourseIds.contains(c.getCourseId()) ? "retake" : "regular");
+            item.put("type", failedCourseIds.contains(c.getCourseId()) ? "retake" : defaultType);
         }
         return item;
     }

@@ -2215,26 +2215,32 @@ async function toggleCourseChecklist() {
       checklist.innerHTML = '<p style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:12px 0">All subjects for this year and semester are already enrolled.</p>';
       return;
     }
-    // Sort: regular first → retake second → blocked last so registrar sees enrollable courses first
-    const typeOrder = { regular: 0, retake: 1, blocked: 2 };
+    // Sort: regular → retake → makeup → blocked
+    const typeOrder = { regular: 0, retake: 1, makeup: 2, blocked: 3 };
     const courses = [...rawCourses].sort((a, b) => (typeOrder[a.type] ?? 0) - (typeOrder[b.type] ?? 0));
 
-    // Show a separator before the blocked section if there are both enrollable and blocked courses
     const hasBlocked  = courses.some(c => c.type === 'blocked');
     const hasEnrollab = courses.some(c => c.type !== 'blocked');
+    const hasMakeup   = courses.some(c => c.type === 'makeup');
 
     checklist.innerHTML = courses.map((c, i) => {
       const id = escHtml(c.courseId);
       const units = `${escHtml(String(c.units))} unit${c.units !== 1 ? 's' : ''}`;
 
-      // Insert a divider label before the first blocked course
       const prevType = i > 0 ? courses[i - 1].type : null;
-      const separator = (c.type === 'blocked' && prevType !== 'blocked' && hasEnrollab)
+
+      const makeupSep = (c.type === 'makeup' && prevType !== 'makeup')
+        ? `<div style="font-size:.72rem;font-weight:600;color:#2563eb;letter-spacing:.04em;padding:6px 2px 2px;text-transform:uppercase">Makeup — subjects from a previous semester</div>`
+        : '';
+
+      const blockedSep = (c.type === 'blocked' && prevType !== 'blocked' && hasEnrollab)
         ? `<div style="font-size:.72rem;font-weight:600;color:var(--gray-400);letter-spacing:.04em;padding:6px 2px 2px;text-transform:uppercase">Cannot enroll — prerequisite not met</div>`
         : '';
 
+      const separator = makeupSep + blockedSep;
+
       if (c.type === 'blocked') {
-        // Blocked: greyed out — checkbox disabled until registrar fills override reason (Option B)
+        // Blocked: greyed out — checkbox disabled until registrar fills override reason
         return separator + `
         <div style="border:1.5px solid var(--gray-200);border-radius:7px;overflow:hidden;opacity:.75">
           <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--gray-50);font-size:.875rem;color:var(--gray-500)">
@@ -2257,8 +2263,21 @@ async function toggleCourseChecklist() {
         </div>`;
       }
 
+      if (c.type === 'makeup') {
+        // Makeup: blue highlight, checked by default — course from a prior semester never taken
+        return separator + `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#eff6ff;border:1.5px solid #3b82f6;border-radius:7px;cursor:pointer;font-size:.875rem;color:var(--gray-800)">
+          <input type="checkbox" class="enrs-course-cb" value="${id}" checked
+            style="width:15px;height:15px;accent-color:#2563eb;flex-shrink:0">
+          <span style="font-size:.7rem;font-weight:700;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:2px 6px;white-space:nowrap">MAKEUP</span>
+          <span style="font-weight:600;color:#1d4ed8;min-width:52px">${escHtml(c.courseCode)}</span>
+          <span style="flex:1">${escHtml(c.courseName)}</span>
+          <span style="color:var(--gray-400);font-size:.8rem;white-space:nowrap">${units}</span>
+        </label>`;
+      }
+
       if (c.type === 'retake') {
-        // Retake: amber highlight, checked by default (Option A)
+        // Retake: amber highlight, checked by default — course the student previously failed
         return `
         <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:7px;cursor:pointer;font-size:.875rem;color:var(--gray-800)">
           <input type="checkbox" class="enrs-course-cb" value="${id}" checked
