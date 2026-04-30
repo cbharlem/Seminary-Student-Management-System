@@ -1281,7 +1281,10 @@ function renderEnrStudentOptions(query) {
       e.preventDefault(); // keep focus on input until selection confirmed
       document.getElementById('enr-student').value = s.studentId;
       document.getElementById('enr-student-search').value = label;
+      const programEl = document.getElementById('enr-program');
+      if (programEl && s.program?.programId) programEl.value = s.program.programId;
       closeEnrStudentDropdown();
+      autoFillEnrYearLevel(s.studentId);
     });
     list.appendChild(item);
   });
@@ -1293,11 +1296,41 @@ function closeEnrStudentDropdown() {
   document.getElementById('enr-student-list').classList.remove('open');
 }
 
+async function autoFillEnrYearLevel(studentId) {
+  const yearEl      = document.getElementById('enr-year');
+  const hintEl      = document.getElementById('enr-year-hint');
+  const confirmBtn  = document.getElementById('btn-confirm-enroll');
+  if (hintEl) { hintEl.textContent = 'Detecting…'; hintEl.style.color = 'var(--gray-500,#6b7280)'; }
+  if (confirmBtn) confirmBtn.disabled = false;
+  clearEnrollError();
+  try {
+    const data = await api(`/api/enrollment/suggested-year-level?studentId=${encodeURIComponent(studentId)}`);
+    if (data.alreadyEnrolled) {
+      showEnrollError('This student is already enrolled in the active semester.');
+      if (confirmBtn) confirmBtn.disabled = true;
+      if (hintEl) hintEl.textContent = '';
+      return;
+    }
+    yearEl.value = String(data.suggestedYearLevel);
+    if (hintEl) {
+      hintEl.textContent = `Auto-detected: ${data.reason}`;
+      hintEl.style.color = 'var(--info,#2563eb)';
+    }
+    filterEnrSections('std');
+  } catch (_) {
+    if (hintEl) hintEl.textContent = '';
+  }
+}
+
 let _enrollTab = 'applicant';
 
 function switchEnrollTab(tab) {
   _enrollTab = tab;
   clearEnrollError();
+  const hintEl = document.getElementById('enr-year-hint');
+  if (hintEl) hintEl.textContent = '';
+  const confirmBtn = document.getElementById('btn-confirm-enroll');
+  if (confirmBtn) confirmBtn.disabled = false;
   document.getElementById('enr-panel-applicant').style.display = tab === 'applicant' ? '' : 'none';
   document.getElementById('enr-panel-student').style.display   = tab === 'student'   ? '' : 'none';
   document.getElementById('enr-tab-applicant').style.background = tab === 'applicant' ? 'var(--navy)' : 'white';
@@ -1377,7 +1410,6 @@ async function saveEnrollment() {
     if (!applicantId) { toast('Please select an admitted applicant', 'error'); return; }
     if (!validateRequired([
       {id:'enr-app-program',  label:'Program'},
-      {id:'enr-app-semester', label:'Semester'},
       {id:'enr-app-year',     label:'Year Level'},
     ])) return;
   } else {
@@ -1982,6 +2014,33 @@ async function saveSchoolYear() {
     }
     closeSemModal();
     loadSchoolYears();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function openGraduateModal() {
+  try {
+    const result = await api(`/api/alumni/eligibility/${_currentStudentId}`);
+    if (!result.eligible) {
+      const semLabel = n => n === 1 ? '1st Semester' : n === 2 ? '2nd Semester' : `Semester ${n}`;
+      const groups = {};
+      result.incomplete.forEach(c => {
+        const key = `${c.yearLevel}-${c.semesterNumber}`;
+        if (!groups[key]) groups[key] = { yearLevel: c.yearLevel, semesterNumber: c.semesterNumber, courses: [] };
+        groups[key].courses.push(c.courseName);
+      });
+      const container = document.getElementById('grad-inelig-list');
+      container.innerHTML = Object.values(groups).map(g =>
+        `<div class="grad-inelig-card" role="listitem">
+          <div class="grad-inelig-card-header">Year ${g.yearLevel} — ${semLabel(g.semesterNumber)}</div>
+          <ul class="grad-inelig-card-courses">
+            ${g.courses.map(name => `<li>${escHtml(name)}</li>`).join('')}
+          </ul>
+        </div>`
+      ).join('');
+      openModal('modal-grad-ineligible');
+      return;
+    }
+    openModal('modal-graduate');
   } catch (e) { toast(e.message, 'error'); }
 }
 

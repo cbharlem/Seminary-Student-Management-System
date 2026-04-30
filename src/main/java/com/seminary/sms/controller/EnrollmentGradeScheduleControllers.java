@@ -39,6 +39,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.format.DateTimeParseException;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -210,6 +211,80 @@ class EnrollmentController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "An unexpected error occurred."));
+        }
+    }
+
+    // Returns the suggested year level for enrolling an existing student in the active semester.
+    // Analyzes the student's enrollment history and the active semester number to cover all cases:
+    //   - No history            → Year 1
+    //   - Last was Sem 1, active is Sem 2  → same year (continuing)
+    //   - Last was Sem 2, active is Sem 1  → year + 1 (advancing)
+    //   - Last was Sem 2, active is Sem 2  → year + 1 (returning after a gap)
+    //   - Summer active semester           → same year
+    //   - Already enrolled this semester   → returns alreadyEnrolled: true
+    @GetMapping("/suggested-year-level")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> getSuggestedYearLevel(@RequestParam String studentId) {
+        try {
+            studentRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
+            Semester active = semesterRepository.findByIsActiveTrue().orElse(null);
+            if (active == null)
+                return ResponseEntity.ok(Map.of("suggestedYearLevel", 1, "reason", "No active semester set"));
+
+            if (enrollmentRepository.findByStudent_StudentIdAndSemester_SemesterId(studentId, active.getSemesterId()).isPresent())
+                return ResponseEntity.ok(Map.of("alreadyEnrolled", true, "suggestedYearLevel", -1));
+
+            List<Enrollment> history = enrollmentRepository.findByStudent_StudentId(studentId).stream()
+                .filter(e -> e.getEnrollmentStatus() != Enrollment.EnrollmentStatus.Dropped
+                          && e.getEnrollmentStatus() != Enrollment.EnrollmentStatus.Withdrawn)
+                .sorted(Comparator
+                    .comparingInt((Enrollment e) -> e.getSemester().getSchoolYear().getIndex())
+                    .thenComparingInt(e -> e.getSemester().getSemesterNumber()))
+                .toList();
+
+            if (history.isEmpty())
+                return ResponseEntity.ok(Map.of("suggestedYearLevel", 1, "reason", "No prior enrollments — starting at Year 1"));
+
+            Enrollment latest = history.get(history.size() - 1);
+            int lastYearLevel = latest.getYearLevel();
+            int lastSemNum    = latest.getSemester().getSemesterNumber();
+            int activeSemNum  = active.getSemesterNumber();
+
+            // Check if student has completed 2nd Semester at their last year level.
+            // This guards against advancing a student who stopped mid-year (did Sem 1 but never Sem 2).
+            boolean completedSem2AtLastYear = history.stream()
+                .anyMatch(e -> e.getYearLevel() == lastYearLevel
+                            && e.getSemester().getSemesterNumber() == 2);
+
+            int suggested;
+            String reason;
+            if (activeSemNum == 1) {
+                if (completedSem2AtLastYear) {
+                    suggested = lastYearLevel + 1;
+                    reason = "Advanced from Year " + lastYearLevel + " — both semesters completed";
+                } else {
+                    suggested = lastYearLevel;
+                    reason = "Year " + lastYearLevel + " incomplete — 2nd Semester not yet taken";
+                }
+            } else if (activeSemNum == 2) {
+                if (lastSemNum == 1) {
+                    suggested = lastYearLevel;
+                    reason = "Continuing Year " + lastYearLevel + " — 2nd Semester";
+                } else {
+                    suggested = lastYearLevel + 1;
+                    reason = "Advanced to Year " + (lastYearLevel + 1) + " — returning student";
+                }
+            } else {
+                suggested = lastYearLevel;
+                reason = "Summer semester — Year " + lastYearLevel;
+            }
+            if (suggested > 10) suggested = 10;
+
+            return ResponseEntity.ok(Map.of("suggestedYearLevel", suggested, "reason", reason));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 

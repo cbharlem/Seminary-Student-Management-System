@@ -342,7 +342,7 @@
     </div>
     <div class="page-header-actions">
       <button class="btn btn-outline registrar-only" id="btn-edit-student" onclick="openEditStudentModal()">Edit Record</button>
-      <button class="btn btn-primary registrar-only" id="btn-graduate" onclick="openModal('modal-graduate')">Graduate</button>
+      <button class="btn btn-primary registrar-only" id="btn-graduate" onclick="openGraduateModal()">Graduate</button>
     </div>
   </div>
   <div class="detail-grid">
@@ -973,7 +973,7 @@
           </div>
         </div>
         <div class="field"><label for="enr-program">Program <span style="color:var(--danger)">*</span></label><select id="enr-program" required><option value="PRG-1001">BA Philosophy</option><option value="PRG-1002">BA Theology</option></select></div>
-        <div class="field"><label for="enr-year">Year Level <span style="color:var(--danger)">*</span></label><select id="enr-year" required onchange="filterEnrSections('std')"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+        <div class="field"><label for="enr-year">Year Level <span style="color:var(--danger)">*</span></label><select id="enr-year" required onchange="filterEnrSections('std')"><option>1</option><option>2</option><option>3</option><option>4</option></select><span id="enr-year-hint" style="font-size:.72rem;margin-top:4px;display:block;min-height:1em"></span></div>
         <div class="field full"><label for="enr-section">Section</label><select id="enr-section"></select></div>
       </div>
     </div>
@@ -1282,6 +1282,24 @@
       <div class="modal-actions">
         <button class="btn btn-primary" onclick="closeModal('modal-reset-pw')">Done</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Graduation Ineligible -->
+<div class="modal-overlay" id="modal-grad-ineligible">
+  <div class="modal" style="max-width:480px">
+    <div class="grad-inelig-header">
+      <span class="grad-inelig-icon" aria-hidden="true">&#9888;</span>
+      <div>
+        <h3 style="margin-bottom:2px">Requirements Not Met</h3>
+        <p class="modal-sub" style="margin-bottom:0">This student has not passed all required courses.</p>
+      </div>
+    </div>
+    <p class="grad-inelig-label">Incomplete courses:</p>
+    <div class="grad-inelig-groups" id="grad-inelig-list" role="list" aria-label="Incomplete courses" aria-live="polite"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-grad-ineligible')" autofocus>Close</button>
     </div>
   </div>
 </div>

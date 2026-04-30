@@ -450,9 +450,26 @@ class AlumniController {
         return alumniService.getAll();
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js openGraduateModal() before showing the graduation form
+    // LAYER 2 → LAYER 3: Delegates to alumniService.checkGraduationEligibility() to get incomplete courses
+    // LAYER 2 → LAYER 1: Returns { eligible: true } or { eligible: false, incomplete: ["Course A", ...] }
+    @GetMapping("/eligibility/{studentId}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> checkEligibility(@PathVariable String studentId) {
+        try {
+            List<Map<String, Object>> incomplete = alumniService.checkGraduationEligibility(studentId);
+            if (incomplete.isEmpty()) {
+                return ResponseEntity.ok(Map.of("eligible", true));
+            }
+            return ResponseEntity.ok(Map.of("eligible", false, "incomplete", incomplete));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // LAYER 1 → LAYER 2: Triggered by app.js graduateStudent() when the registrar graduates a student
-    // LAYER 2 → LAYER 3: Delegates to alumniService.graduateStudent() which changes the student status and creates an Alumni record
-    // LAYER 2 → LAYER 1: Returns the new Alumni JSON, or 400 if the student is already an alumnus
+    // LAYER 2 → LAYER 3: Delegates to alumniService.graduateStudent() which verifies curriculum completion, changes status, and creates an Alumni record
+    // LAYER 2 → LAYER 1: Returns the new Alumni JSON, or 400 if requirements are not met or student is already an alumnus
     @PostMapping("/graduate/{studentId}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> graduate(@PathVariable String studentId,

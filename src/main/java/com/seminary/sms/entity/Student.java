@@ -110,5 +110,5 @@ public class Student {
 
     public enum Gender { Male, Female, Other }
     public enum SeminaryLevel { Propaedeutic, College }
-    public enum StudentStatus { Active, Inactive, LOA, Dismissed, Graduated, Alumni }
+    public enum StudentStatus { Active, Inactive, LOA, Dismissed, Alumni }
 }
