@@ -49,6 +49,7 @@ public class EnrollmentService {
     private final SemesterRepository semesterRepository;
     private final StudentSectionRepository studentSectionRepository;
     private final CourseRepository courseRepository;
+    private final StudentRepository studentRepository;
 
     // LAYER 2 → LAYER 3: Called by EnrollmentController.getByStudent() to show a student's enrollment history
     // LAYER 3 → LAYER 4: Calls enrollmentRepository.findByStudent_StudentId()
@@ -114,6 +115,10 @@ public class EnrollmentService {
             .enrollmentStatus(Enrollment.EnrollmentStatus.Enrolled)
             .build();
         enrollment = enrollmentRepository.save(enrollment);
+
+        // Keep Student.currentYearLevel in sync with the latest enrollment
+        student.setCurrentYearLevel(yearLevel);
+        studentRepository.save(student);
 
         // Assign section
         if (section != null) {

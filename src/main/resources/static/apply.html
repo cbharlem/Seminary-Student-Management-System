@@ -90,12 +90,13 @@
     background: white; border-radius: 10px;
     border: 1px solid var(--gray-200);
     box-shadow: 0 2px 12px rgba(13,27,94,0.06);
-    margin-bottom: 16px; overflow: hidden;
+    margin-bottom: 16px;
   }
   .form-card-header {
     padding: 14px 24px;
     background: var(--gray-50);
     border-bottom: 1px solid var(--gray-200);
+    border-radius: 10px 10px 0 0;
     font-size: 0.78rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.07em;
     color: var(--gray-600);
@@ -192,6 +193,52 @@
   }
   .sub-id-badge strong { color: var(--navy); font-weight: 700; }
 
+  /* ── Nationality combobox ────────────────────────────── */
+  .nat-wrap { position: relative; }
+  .nat-input-row {
+    display: flex; align-items: center;
+    border: 1.5px solid var(--gray-200); border-radius: 7px;
+    background: white; transition: border-color .2s;
+    overflow: hidden;
+  }
+  .nat-input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(46,75,189,0.08);
+  }
+  .nat-input-row.open { border-color: var(--accent); border-radius: 7px 7px 0 0; }
+  .nat-search {
+    flex: 1; padding: 10px 14px;
+    border: none; outline: none; background: transparent;
+    font-size: 0.9rem; font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--gray-800);
+  }
+  .nat-chevron {
+    padding: 0 12px; color: var(--gray-400);
+    display: flex; align-items: center; flex-shrink: 0;
+    transition: transform .2s; pointer-events: none;
+  }
+  .nat-input-row.open .nat-chevron { transform: rotate(180deg); }
+  .nat-dropdown {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    background: white; border: 1.5px solid var(--accent);
+    border-top: none; border-radius: 0 0 7px 7px;
+    max-height: 220px; overflow-y: auto;
+    z-index: 200;
+    box-shadow: 0 8px 24px rgba(13,27,94,0.10);
+  }
+  .nat-dropdown.show { display: block; }
+  .nat-option {
+    padding: 9px 14px; font-size: 0.9rem;
+    color: var(--gray-800); cursor: pointer;
+    transition: background .12s;
+  }
+  .nat-option:hover, .nat-option.active { background: rgba(46,75,189,0.07); color: var(--accent); }
+  .nat-option.selected { font-weight: 600; color: var(--accent); }
+  .nat-empty {
+    padding: 10px 14px; font-size: 0.87rem;
+    color: var(--gray-400); font-style: italic;
+  }
+
   /* ── Footer ──────────────────────────────────────────── */
   .page-footer {
     text-align: center; margin-top: 40px;
@@ -274,8 +321,8 @@
                  placeholder="e.g. dela Cruz"/>
         </div>
         <div class="field">
-          <label for="middleName">Middle Name</label>
-          <input type="text" id="middleName" name="middleName" autocomplete="additional-name"
+          <label for="middleName">Middle Name <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="middleName" name="middleName" required autocomplete="additional-name"
                  placeholder="e.g. Santos"/>
         </div>
         <div class="field">
@@ -283,8 +330,8 @@
           <input type="date" id="dateOfBirth" name="dateOfBirth" required autocomplete="bday"/>
         </div>
         <div class="field">
-          <label for="placeOfBirth">Place of Birth</label>
-          <input type="text" id="placeOfBirth" name="placeOfBirth"
+          <label for="placeOfBirth">Place of Birth <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="placeOfBirth" name="placeOfBirth" required
                  placeholder="e.g. Lipa City, Batangas"/>
         </div>
       </div>
@@ -300,23 +347,33 @@
                  placeholder="e.g. juan@example.com"/>
         </div>
         <div class="field">
-          <label for="contactNumber">Contact Number</label>
-          <input type="tel" id="contactNumber" name="contactNumber" autocomplete="tel"
+          <label for="contactNumber">Contact Number <span class="req" aria-hidden="true">*</span></label>
+          <input type="tel" id="contactNumber" name="contactNumber" required autocomplete="tel"
                  placeholder="e.g. 09171234567"/>
         </div>
         <div class="field">
-          <label for="nationality">Nationality</label>
-          <input type="text" id="nationality" name="nationality" autocomplete="off"
-                 placeholder="e.g. Filipino"/>
-        </div>
-        <div class="field">
-          <label for="religion">Religion</label>
-          <input type="text" id="religion" name="religion" autocomplete="off"
-                 placeholder="e.g. Roman Catholic"/>
+          <label for="nat-search">Nationality <span class="req" aria-hidden="true">*</span></label>
+          <input type="hidden" id="nationality" name="nationality" required/>
+          <div class="nat-wrap">
+            <div class="nat-input-row" id="nat-input-row">
+              <input type="text" id="nat-search" class="nat-search"
+                     placeholder="Search nationality…"
+                     autocomplete="off" aria-autocomplete="list"
+                     aria-controls="nat-dropdown" aria-expanded="false"
+                     role="combobox"/>
+              <span class="nat-chevron" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </span>
+            </div>
+            <div class="nat-dropdown" id="nat-dropdown" role="listbox"></div>
+          </div>
         </div>
         <div class="field full">
-          <label for="address">Complete Address</label>
-          <textarea id="address" name="address" autocomplete="street-address" rows="3"
+          <label for="address">Complete Address <span class="req" aria-hidden="true">*</span></label>
+          <textarea id="address" name="address" required autocomplete="street-address" rows="3"
                     placeholder="House/Unit No., Street, Barangay, City/Municipality, Province"></textarea>
         </div>
       </div>
@@ -348,23 +405,23 @@
       <div class="form-card-header">Family Background</div>
       <div class="form-card-body">
         <div class="field">
-          <label for="fatherName">Father's Full Name</label>
-          <input type="text" id="fatherName" name="fatherName" autocomplete="off"
+          <label for="fatherName">Father's Full Name <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="fatherName" name="fatherName" required autocomplete="off"
                  placeholder="e.g. Pedro dela Cruz"/>
         </div>
         <div class="field">
-          <label for="fatherOccupation">Father's Occupation</label>
-          <input type="text" id="fatherOccupation" name="fatherOccupation" autocomplete="off"
+          <label for="fatherOccupation">Father's Occupation <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="fatherOccupation" name="fatherOccupation" required autocomplete="off"
                  placeholder="e.g. Farmer"/>
         </div>
         <div class="field">
-          <label for="motherName">Mother's Full Name</label>
-          <input type="text" id="motherName" name="motherName" autocomplete="off"
+          <label for="motherName">Mother's Full Name <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="motherName" name="motherName" required autocomplete="off"
                  placeholder="e.g. Maria Santos"/>
         </div>
         <div class="field">
-          <label for="motherOccupation">Mother's Occupation</label>
-          <input type="text" id="motherOccupation" name="motherOccupation" autocomplete="off"
+          <label for="motherOccupation">Mother's Occupation <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="motherOccupation" name="motherOccupation" required autocomplete="off"
                  placeholder="e.g. Teacher"/>
         </div>
         <div class="field">
@@ -383,18 +440,18 @@
       <div class="form-card-header">Previous Education</div>
       <div class="form-card-body">
         <div class="field full">
-          <label for="lastSchoolAttended">Last School Attended</label>
-          <input type="text" id="lastSchoolAttended" name="lastSchoolAttended" autocomplete="off"
+          <label for="lastSchoolAttended">Last School Attended <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="lastSchoolAttended" name="lastSchoolAttended" required autocomplete="off"
                  placeholder="e.g. St. Joseph High School"/>
         </div>
         <div class="field">
-          <label for="lastSchoolYear">School Year</label>
-          <input type="text" id="lastSchoolYear" name="lastSchoolYear" autocomplete="off"
+          <label for="lastSchoolYear">School Year <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="lastSchoolYear" name="lastSchoolYear" required autocomplete="off"
                  placeholder="e.g. 2023-2024"/>
         </div>
         <div class="field">
-          <label for="lastYearLevel">Year Level / Grade</label>
-          <input type="text" id="lastYearLevel" name="lastYearLevel" autocomplete="off"
+          <label for="lastYearLevel">Year Level / Grade <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="lastYearLevel" name="lastYearLevel" required autocomplete="off"
                  placeholder="e.g. Grade 12 / 4th Year"/>
         </div>
       </div>
@@ -459,21 +516,45 @@ form.addEventListener('submit', async (e) => {
   hideMsg(msgSubmitError);
 
   // Client-side validation — WCAG 2.1 / Nielsen #9 (error prevention)
-  const firstName = val('firstName');
-  const lastName  = val('lastName');
-  const dob       = val('dateOfBirth');
-  const email     = val('email');
-  const level     = val('seminaryLevel');
-  const program   = val('appliedProgram');
+  const firstName         = val('firstName');
+  const lastName          = val('lastName');
+  const middleName        = val('middleName');
+  const dob               = val('dateOfBirth');
+  const placeOfBirth      = val('placeOfBirth');
+  const email             = val('email');
+  const contactNumber     = val('contactNumber');
+  const nationality       = val('nationality');
+  const address           = val('address');
+  const level             = val('seminaryLevel');
+  const program           = val('appliedProgram');
+  const fatherName        = val('fatherName');
+  const fatherOccupation  = val('fatherOccupation');
+  const motherName        = val('motherName');
+  const motherOccupation  = val('motherOccupation');
+  const lastSchoolAttended = val('lastSchoolAttended');
+  const lastSchoolYear    = val('lastSchoolYear');
+  const lastYearLevel     = val('lastYearLevel');
 
-  if (!firstName) return showError(msgError, 'First name is required.');
-  if (!lastName)  return showError(msgError, 'Last name is required.');
-  if (!dob)       return showError(msgError, 'Date of birth is required.');
-  if (!email)     return showError(msgError, 'Email address is required.');
+  if (!firstName)         return showError(msgError, 'First name is required.');
+  if (!lastName)          return showError(msgError, 'Last name is required.');
+  if (!middleName)        return showError(msgError, 'Middle name is required.');
+  if (!dob)               return showError(msgError, 'Date of birth is required.');
+  if (!placeOfBirth)      return showError(msgError, 'Place of birth is required.');
+  if (!email)             return showError(msgError, 'Email address is required.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return showError(msgError, 'Please enter a valid email address.');
-  if (!level)   return showError(msgError, 'Seminary level is required.');
-  if (!program) return showError(msgError, 'Applied program is required.');
+  if (!contactNumber)     return showError(msgError, 'Contact number is required.');
+  if (!nationality)       return showError(msgError, 'Nationality is required.');
+  if (!address)           return showError(msgError, 'Complete address is required.');
+  if (!level)             return showError(msgError, 'Seminary level is required.');
+  if (!program)           return showError(msgError, 'Applied program is required.');
+  if (!fatherName)        return showError(msgError, "Father's full name is required.");
+  if (!fatherOccupation)  return showError(msgError, "Father's occupation is required.");
+  if (!motherName)        return showError(msgError, "Mother's full name is required.");
+  if (!motherOccupation)  return showError(msgError, "Mother's occupation is required.");
+  if (!lastSchoolAttended) return showError(msgError, 'Last school attended is required.');
+  if (!lastSchoolYear)    return showError(msgError, 'School year is required.');
+  if (!lastYearLevel)     return showError(msgError, 'Year level / grade is required.');
 
   // Build request body matching OnlineSubmission fields
   const body = {
@@ -486,7 +567,7 @@ form.addEventListener('submit', async (e) => {
     email,
     contactNumber:      val('contactNumber')       || null,
     nationality:        val('nationality')         || null,
-    religion:           val('religion')            || null,
+    religion:           'Roman Catholic',
     address:            val('address')             || null,
     fatherName:         val('fatherName')          || null,
     fatherOccupation:   val('fatherOccupation')    || null,
@@ -541,6 +622,112 @@ function val(id)        { return document.getElementById(id)?.value?.trim() || '
 function esc(s)         { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function showError(el, msg) { el.textContent = msg; el.classList.add('show'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 function hideMsg(el)    { el.classList.remove('show'); }
+
+// ── Nationality combobox ─────────────────────────────────────────────────────
+const NATIONALITIES = [
+  'Afghan','Albanian','Algerian','American','Andorran','Angolan','Argentine',
+  'Armenian','Australian','Austrian','Azerbaijani','Bahamian','Bahraini',
+  'Bangladeshi','Barbadian','Belarusian','Belgian','Belizean','Beninese',
+  'Bhutanese','Bolivian','Bosnian','Brazilian','British','Bruneian','Bulgarian',
+  'Burkinabe','Burmese','Burundian','Cambodian','Cameroonian','Canadian',
+  'Cape Verdean','Central African','Chadian','Chilean','Chinese','Colombian',
+  'Comorian','Congolese','Costa Rican','Croatian','Cuban','Cypriot','Czech',
+  'Danish','Djiboutian','Dominican','Dutch','Ecuadorian','Egyptian','Emirati',
+  'Equatorial Guinean','Eritrean','Estonian','Ethiopian','Fijian','Filipino',
+  'Finnish','French','Gabonese','Gambian','Georgian','German','Ghanaian',
+  'Greek','Grenadian','Guatemalan','Guinean','Guyanese','Haitian','Honduran',
+  'Hungarian','Icelandic','Indian','Indonesian','Iranian','Iraqi','Irish',
+  'Israeli','Italian','Ivorian','Jamaican','Japanese','Jordanian','Kazakhstani',
+  'Kenyan','Korean','Kuwaiti','Kyrgyz','Lao','Latvian','Lebanese','Liberian',
+  'Libyan','Lithuanian','Luxembourgish','Malagasy','Malawian','Malaysian',
+  'Maldivian','Malian','Maltese','Mauritanian','Mauritian','Mexican','Moldovan',
+  'Mongolian','Montenegrin','Moroccan','Mozambican','Namibian','Nepalese',
+  'New Zealander','Nicaraguan','Nigerian','Nigerien','Norwegian','Omani',
+  'Pakistani','Panamanian','Papua New Guinean','Paraguayan','Peruvian','Polish',
+  'Portuguese','Qatari','Romanian','Russian','Rwandan','Saudi','Senegalese',
+  'Serbian','Sierra Leonean','Singaporean','Slovak','Slovenian','Somali',
+  'South African','South Sudanese','Spanish','Sri Lankan','Sudanese',
+  'Surinamese','Swedish','Swiss','Syrian','Taiwanese','Tajik','Tanzanian',
+  'Thai','Timorese','Togolese','Trinidadian','Tunisian','Turkish','Turkmen',
+  'Ugandan','Ukrainian','Uruguayan','Uzbek','Venezuelan','Vietnamese',
+  'Yemeni','Zambian','Zimbabwean'
+];
+
+(function () {
+  const hiddenInput  = document.getElementById('nationality');
+  const searchInput  = document.getElementById('nat-search');
+  const dropdown     = document.getElementById('nat-dropdown');
+  const inputRow     = document.getElementById('nat-input-row');
+  let activeIndex    = -1;
+  let selected       = 'Filipino';
+
+  function setSelected(val) {
+    selected = val;
+    hiddenInput.value  = val;
+    searchInput.value  = val;
+    closeDropdown();
+  }
+
+  function renderOptions(filter) {
+    const q = (filter || '').toLowerCase();
+    const matches = q
+      ? NATIONALITIES.filter(n => n.toLowerCase().includes(q))
+      : NATIONALITIES;
+    if (!matches.length) {
+      dropdown.innerHTML = '<div class="nat-empty">No results found</div>';
+    } else {
+      dropdown.innerHTML = matches.map((n, i) =>
+        `<div class="nat-option${n === selected ? ' selected' : ''}" data-val="${n}" data-i="${i}" role="option">${n}</div>`
+      ).join('');
+    }
+    activeIndex = -1;
+  }
+
+  function openDropdown() {
+    renderOptions(searchInput.value !== selected ? searchInput.value : '');
+    dropdown.classList.add('show');
+    inputRow.classList.add('open');
+    searchInput.setAttribute('aria-expanded', 'true');
+    if (searchInput.value === selected) {
+      searchInput.select();
+    }
+  }
+
+  function closeDropdown() {
+    dropdown.classList.remove('show');
+    inputRow.classList.remove('open');
+    searchInput.setAttribute('aria-expanded', 'false');
+    if (!selected) searchInput.value = '';
+  }
+
+  function highlightActive(items) {
+    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+    if (activeIndex >= 0) items[activeIndex].scrollIntoView({ block: 'nearest' });
+  }
+
+  searchInput.addEventListener('focus', openDropdown);
+  inputRow.addEventListener('click', () => { if (dropdown.classList.contains('show')) { closeDropdown(); } else { searchInput.focus(); openDropdown(); } });
+  searchInput.addEventListener('input', () => { selected = ''; hiddenInput.value = ''; renderOptions(searchInput.value); dropdown.classList.add('show'); inputRow.classList.add('open'); });
+
+  searchInput.addEventListener('keydown', e => {
+    const items = [...dropdown.querySelectorAll('.nat-option')];
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, items.length - 1); highlightActive(items); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); highlightActive(items); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (activeIndex >= 0 && items[activeIndex]) setSelected(items[activeIndex].dataset.val); }
+    else if (e.key === 'Escape') { closeDropdown(); searchInput.blur(); }
+  });
+
+  dropdown.addEventListener('mousedown', e => {
+    const opt = e.target.closest('.nat-option');
+    if (opt) { e.preventDefault(); setSelected(opt.dataset.val); }
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (!document.getElementById('nat-input-row').contains(e.target) && !dropdown.contains(e.target)) closeDropdown();
+  });
+
+  setSelected('Filipino');
+})();
 
 // Show the info note once the page settles
 window.addEventListener('load', () => {

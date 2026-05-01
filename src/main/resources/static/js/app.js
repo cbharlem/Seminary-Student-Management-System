@@ -1190,7 +1190,7 @@ function openEditStudentModal() {
   document.getElementById('st-guardian').value   = s.guardianName || '';
   document.getElementById('st-guardian-contact').value = s.guardianContact || '';
   // Religious
-  document.getElementById('st-religion').value   = s.religion || '';
+  document.getElementById('st-religion').value   = s.religion || 'Roman Catholic';
   document.getElementById('st-diocese').value    = s.diocese || '';
   document.getElementById('st-priest').value     = s.parishPriest || '';
   document.getElementById('st-baptism').value    = s.baptismDate || '';
@@ -2175,7 +2175,7 @@ async function viewApplicantDetail(id) {
     document.getElementById('apd-guardian').value        = a.guardianName || '';
     document.getElementById('apd-guardian-contact').value= a.guardianContact || '';
     document.getElementById('apd-nationality').value     = a.nationality || '';
-    document.getElementById('apd-religion').value        = a.religion || '';
+    document.getElementById('apd-religion').value        = a.religion || 'Roman Catholic';
 
     // Load application status
     let currentStatus = 'Applied';
@@ -2232,7 +2232,7 @@ function copyCredField(elementId) {
 }
 
 function applicantEditMode(on) {
-  const inputs = ['apd-fname','apd-lname','apd-mname','apd-dob','apd-email','apd-contact','apd-address','apd-school','apd-schoolyr','apd-schoollvl','apd-father','apd-father-occ','apd-mother','apd-mother-occ','apd-guardian','apd-guardian-contact','apd-nationality','apd-religion'];
+  const inputs = ['apd-fname','apd-lname','apd-mname','apd-dob','apd-email','apd-contact','apd-address','apd-school','apd-schoolyr','apd-schoollvl','apd-father','apd-father-occ','apd-mother','apd-mother-occ','apd-guardian','apd-guardian-contact','apd-nationality'];
   inputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.readOnly = !on;

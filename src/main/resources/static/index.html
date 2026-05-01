@@ -255,7 +255,7 @@
 <div id="page-applicants" class="page">
   <div class="page-header">
     <div><h2>Applicants</h2><p>Manage the admissions pipeline</p></div>
-    <button class="btn btn-primary registrar-only" onclick="['ap-fname','ap-lname','ap-mname','ap-dob','ap-pob','ap-email','ap-contact','ap-nationality','ap-religion','ap-address','ap-father','ap-father-occ','ap-mother','ap-mother-occ','ap-guardian','ap-guardian-contact','ap-school','ap-school-year','ap-year-level'].forEach(id=>{document.getElementById(id).value=''}); openModal('modal-applicant')">+ Add Applicant</button>
+    <button class="btn btn-primary registrar-only" onclick="['ap-fname','ap-lname','ap-mname','ap-dob','ap-pob','ap-email','ap-contact','ap-nationality','ap-address','ap-father','ap-father-occ','ap-mother','ap-mother-occ','ap-guardian','ap-guardian-contact','ap-school','ap-school-year','ap-year-level'].forEach(id=>{document.getElementById(id).value=''}); openModal('modal-applicant')">+ Add Applicant</button>
   </div>
   <div class="pipeline" id="pipeline-display">
     <div class="pipe-step"><div class="pipe-dot done" id="pc-applied">0</div><div class="pipe-label">Applied</div></div>
@@ -793,7 +793,7 @@
       <div class="field"><label for="ap-email">Email <span style="color:var(--danger)">*</span></label><input id="ap-email" type="email" required placeholder="e.g. juan@email.com" title="Email is required — credentials will be sent here upon enrollment"/></div>
       <div class="field"><label for="ap-contact">Contact Number</label><input id="ap-contact" type="tel" placeholder="e.g. 09171234567"/></div>
       <div class="field"><label for="ap-nationality">Nationality</label><input id="ap-nationality" placeholder="e.g. Filipino"/></div>
-      <div class="field"><label for="ap-religion">Religion</label><input id="ap-religion" placeholder="e.g. Roman Catholic"/></div>
+      <div class="field"><label for="ap-religion">Religion</label><input id="ap-religion" value="Roman Catholic" class="input-readonly" readonly/></div>
       <div class="field full"><label for="ap-address">Address</label><input id="ap-address" placeholder="Street, Barangay, City, Province"/></div>
     </div>
 
@@ -864,7 +864,7 @@
       <div class="field"><label for="st-guardian-contact">Guardian Contact</label><input id="st-guardian-contact" type="tel" placeholder="e.g. 09171234567"/></div>
     </div>
     <div id="st-tab-religious" class="modal-grid" style="display:none">
-      <div class="field"><label for="st-religion">Religion</label><input id="st-religion" value="Roman Catholic"/></div>
+      <div class="field"><label for="st-religion">Religion</label><input id="st-religion" value="Roman Catholic" class="input-readonly" readonly/></div>
       <div class="field"><label for="st-diocese">Diocese</label><input id="st-diocese"/></div>
       <div class="field"><label for="st-priest">Parish Priest</label><input id="st-priest"/></div>
       <div class="field"><label for="st-baptism">Baptism Date</label><input id="st-baptism" type="date"/></div>
