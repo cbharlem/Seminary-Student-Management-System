@@ -193,6 +193,60 @@
   }
   .sub-id-badge strong { color: var(--navy); font-weight: 700; }
 
+  /* ── Document upload ─────────────────────────────────── */
+  .doc-row {
+    padding: 14px 0; border-bottom: 1px solid var(--gray-100);
+  }
+  .doc-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .doc-row:first-child { padding-top: 0; }
+  .doc-name {
+    font-size: 0.82rem; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;
+  }
+  .doc-name .req { color: var(--danger); margin-left: 2px; }
+  .doc-desc { font-size: 0.78rem; color: var(--gray-400); margin-bottom: 10px; }
+  .doc-attach-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 14px; border-radius: 7px;
+    border: 1.5px solid var(--gray-200); background: white; cursor: pointer;
+    font-size: 0.9rem; font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 500; color: var(--gray-600);
+    transition: all .15s;
+  }
+  .doc-attach-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px rgba(46,75,189,0.08); }
+  .doc-attach-btn.missing { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+  .doc-attach-btn input[type="file"] { display: none; }
+  .doc-file-card {
+    display: none; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--gray-200); background: var(--gray-50);
+    max-width: 420px;
+  }
+  .doc-file-card.show { display: flex; }
+  .doc-file-thumb {
+    width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.02em;
+    color: white;
+  }
+  .doc-file-thumb.pdf  { background: #e53935; }
+  .doc-file-thumb.img  { background: #1e88e5; }
+  .doc-file-thumb.other{ background: var(--gray-400); }
+  .doc-file-meta { flex: 1; min-width: 0; }
+  .doc-file-name {
+    display: block; font-size: 0.84rem; font-weight: 600; color: var(--accent);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-decoration: none; cursor: pointer;
+  }
+  .doc-file-name:hover { text-decoration: underline; }
+  .doc-file-size { font-size: 0.75rem; color: var(--gray-400); margin-top: 1px; }
+  .doc-file-remove {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    border: none; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gray-400); transition: all .15s;
+  }
+  .doc-file-remove:hover { background: var(--danger-bg); color: var(--danger); }
+
   /* ── Nationality combobox ────────────────────────────── */
   .nat-wrap { position: relative; }
   .nat-input-row {
@@ -457,6 +511,117 @@
       </div>
     </div>
 
+    <!-- Section 6: Required Documents -->
+    <div class="form-card">
+      <div class="form-card-header">Required Documents</div>
+      <div class="form-card-body" style="grid-template-columns:1fr; gap:0; padding:20px 24px;">
+        <p style="font-size:0.82rem;color:var(--gray-400);margin:0 0 16px">
+          Upload clear scans or photos. Accepted formats: PDF, JPG, PNG. Maximum 5 MB per file.
+        </p>
+
+        <!-- Birth Certificate -->
+        <div class="doc-row">
+          <div class="doc-name">Birth Certificate <span class="req" aria-hidden="true">*</span></div>
+          <div class="doc-desc">PSA-issued birth certificate</div>
+          <label class="doc-attach-btn" id="lbl-birth">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Add file
+            <input type="file" id="doc-birth" name="birthCertificate" accept=".pdf,.jpg,.jpeg,.png"
+                   onchange="onDocChange(this,'lbl-birth','card-birth','cname-birth','csize-birth')"/>
+          </label>
+          <div class="doc-file-card" id="card-birth">
+            <div class="doc-file-thumb" id="cthumb-birth">PDF</div>
+            <div class="doc-file-meta">
+              <a class="doc-file-name" id="cname-birth" href="#" target="_blank" rel="noopener"></a>
+              <div class="doc-file-size" id="csize-birth"></div>
+            </div>
+            <button type="button" class="doc-file-remove" onclick="clearDoc('doc-birth','lbl-birth','card-birth')" title="Remove file">&#x2715;</button>
+          </div>
+        </div>
+
+        <!-- Baptismal Certificate -->
+        <div class="doc-row">
+          <div class="doc-name">Baptismal Certificate <span class="req" aria-hidden="true">*</span></div>
+          <div class="doc-desc">Certificate of baptism from your parish</div>
+          <label class="doc-attach-btn" id="lbl-baptismal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Add file
+            <input type="file" id="doc-baptismal" name="baptismalCertificate" accept=".pdf,.jpg,.jpeg,.png"
+                   onchange="onDocChange(this,'lbl-baptismal','card-baptismal','cname-baptismal','csize-baptismal')"/>
+          </label>
+          <div class="doc-file-card" id="card-baptismal">
+            <div class="doc-file-thumb" id="cthumb-baptismal">PDF</div>
+            <div class="doc-file-meta">
+              <a class="doc-file-name" id="cname-baptismal" href="#" target="_blank" rel="noopener"></a>
+              <div class="doc-file-size" id="csize-baptismal"></div>
+            </div>
+            <button type="button" class="doc-file-remove" onclick="clearDoc('doc-baptismal','lbl-baptismal','card-baptismal')" title="Remove file">&#x2715;</button>
+          </div>
+        </div>
+
+        <!-- Confirmation Certificate -->
+        <div class="doc-row">
+          <div class="doc-name">Confirmation Certificate <span class="req" aria-hidden="true">*</span></div>
+          <div class="doc-desc">Certificate of confirmation from your parish</div>
+          <label class="doc-attach-btn" id="lbl-confirmation">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Add file
+            <input type="file" id="doc-confirmation" name="confirmationCertificate" accept=".pdf,.jpg,.jpeg,.png"
+                   onchange="onDocChange(this,'lbl-confirmation','card-confirmation','cname-confirmation','csize-confirmation')"/>
+          </label>
+          <div class="doc-file-card" id="card-confirmation">
+            <div class="doc-file-thumb" id="cthumb-confirmation">PDF</div>
+            <div class="doc-file-meta">
+              <a class="doc-file-name" id="cname-confirmation" href="#" target="_blank" rel="noopener"></a>
+              <div class="doc-file-size" id="csize-confirmation"></div>
+            </div>
+            <button type="button" class="doc-file-remove" onclick="clearDoc('doc-confirmation','lbl-confirmation','card-confirmation')" title="Remove file">&#x2715;</button>
+          </div>
+        </div>
+
+        <!-- Report Card -->
+        <div class="doc-row">
+          <div class="doc-name">Report Card (Form 138) <span class="req" aria-hidden="true">*</span></div>
+          <div class="doc-desc">Most recent report card or Form 138</div>
+          <label class="doc-attach-btn" id="lbl-reportcard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Add file
+            <input type="file" id="doc-reportcard" name="reportCard" accept=".pdf,.jpg,.jpeg,.png"
+                   onchange="onDocChange(this,'lbl-reportcard','card-reportcard','cname-reportcard','csize-reportcard')"/>
+          </label>
+          <div class="doc-file-card" id="card-reportcard">
+            <div class="doc-file-thumb" id="cthumb-reportcard">PDF</div>
+            <div class="doc-file-meta">
+              <a class="doc-file-name" id="cname-reportcard" href="#" target="_blank" rel="noopener"></a>
+              <div class="doc-file-size" id="csize-reportcard"></div>
+            </div>
+            <button type="button" class="doc-file-remove" onclick="clearDoc('doc-reportcard','lbl-reportcard','card-reportcard')" title="Remove file">&#x2715;</button>
+          </div>
+        </div>
+
+        <!-- Good Moral Certificate -->
+        <div class="doc-row">
+          <div class="doc-name">Good Moral Certificate <span class="req" aria-hidden="true">*</span></div>
+          <div class="doc-desc">Certificate of good moral character from your last school</div>
+          <label class="doc-attach-btn" id="lbl-goodmoral">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Add file
+            <input type="file" id="doc-goodmoral" name="goodMoral" accept=".pdf,.jpg,.jpeg,.png"
+                   onchange="onDocChange(this,'lbl-goodmoral','card-goodmoral','cname-goodmoral','csize-goodmoral')"/>
+          </label>
+          <div class="doc-file-card" id="card-goodmoral">
+            <div class="doc-file-thumb" id="cthumb-goodmoral">PDF</div>
+            <div class="doc-file-meta">
+              <a class="doc-file-name" id="cname-goodmoral" href="#" target="_blank" rel="noopener"></a>
+              <div class="doc-file-size" id="csize-goodmoral"></div>
+            </div>
+            <button type="button" class="doc-file-remove" onclick="clearDoc('doc-goodmoral','lbl-goodmoral','card-goodmoral')" title="Remove file">&#x2715;</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- Submit -->
     <div class="submit-section">
       <div class="msg info" id="msg-info" style="text-align:left">
@@ -556,31 +721,26 @@ form.addEventListener('submit', async (e) => {
   if (!lastSchoolYear)    return showError(msgError, 'School year is required.');
   if (!lastYearLevel)     return showError(msgError, 'Year level / grade is required.');
 
-  // Build request body matching OnlineSubmission fields
-  const body = {
-    firstName,
-    middleName:         val('middleName')         || null,
-    lastName,
-    dateOfBirth:        dob,
-    placeOfBirth:       val('placeOfBirth')        || null,
-    gender:             'Male',
-    email,
-    contactNumber:      val('contactNumber')       || null,
-    nationality:        val('nationality')         || null,
-    religion:           'Roman Catholic',
-    address:            val('address')             || null,
-    fatherName:         val('fatherName')          || null,
-    fatherOccupation:   val('fatherOccupation')    || null,
-    motherName:         val('motherName')          || null,
-    motherOccupation:   val('motherOccupation')    || null,
-    guardianName:       val('guardianName')        || null,
-    guardianContact:    val('guardianContact')     || null,
-    lastSchoolAttended: val('lastSchoolAttended')  || null,
-    lastSchoolYear:     val('lastSchoolYear')      || null,
-    lastYearLevel:      val('lastYearLevel')       || null,
-    seminaryLevel:      level,
-    appliedProgram: { programId: program }
-  };
+  // Document validation
+  const docInputs = [
+    { id: 'doc-birth',        label: 'lbl-birth',        name: 'Birth certificate' },
+    { id: 'doc-baptismal',    label: 'lbl-baptismal',    name: 'Baptismal certificate' },
+    { id: 'doc-confirmation', label: 'lbl-confirmation', name: 'Confirmation certificate' },
+    { id: 'doc-reportcard',   label: 'lbl-reportcard',   name: 'Report card' },
+    { id: 'doc-goodmoral',    label: 'lbl-goodmoral',    name: 'Good moral certificate' },
+  ];
+  for (const d of docInputs) {
+    if (!document.getElementById(d.id).files.length) {
+      document.getElementById(d.label).classList.add('missing');
+      return showError(msgError, d.name + ' is required.');
+    }
+  }
+
+  // Build multipart FormData — browser sets Content-Type with boundary automatically
+  const formData = new FormData(form);
+  formData.set('religion', 'Roman Catholic');
+  formData.set('gender', 'Male');
+  formData.set('appliedProgram', program);
 
   // Show loading state
   btnSubmit.disabled = true;
@@ -589,8 +749,7 @@ form.addEventListener('submit', async (e) => {
   try {
     const res = await fetch('/api/public/apply', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: formData
     });
     const data = await res.json();
 
@@ -618,6 +777,37 @@ form.addEventListener('submit', async (e) => {
 });
 
 // ── Utilities ────────────────────────────────────────────────────────────────
+function onDocChange(input, lblId, cardId, nameId, sizeId) {
+  const lbl = document.getElementById(lblId);
+  lbl.classList.remove('missing');
+  if (!input.files.length) return;
+  const file = input.files[0];
+  const url  = URL.createObjectURL(file);
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const key  = lblId.replace('lbl-', '');
+  const thumb = document.getElementById('cthumb-' + key);
+  thumb.textContent  = ext.toUpperCase();
+  thumb.className    = 'doc-file-thumb ' + (ext === 'pdf' ? 'pdf' : 'img');
+  const nameEl       = document.getElementById(nameId);
+  nameEl.textContent = file.name;
+  nameEl.href        = url;
+  document.getElementById(sizeId).textContent = formatSize(file.size);
+  document.getElementById(cardId).classList.add('show');
+  lbl.style.display  = 'none';
+}
+
+function clearDoc(inputId, lblId, cardId) {
+  document.getElementById(inputId).value = '';
+  document.getElementById(cardId).classList.remove('show');
+  document.getElementById(lblId).style.display = '';
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024)    return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
 function val(id)        { return document.getElementById(id)?.value?.trim() || ''; }
 function esc(s)         { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function showError(el, msg) { el.textContent = msg; el.classList.add('show'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }

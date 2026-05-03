@@ -26,6 +26,7 @@ package com.seminary.sms.controller;
 // ─────────────────────────────────────────────────────────────────────────────
 
 import com.seminary.sms.repository.UserRepository;
+import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +54,7 @@ public class MeController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js init() immediately on page load to identify the logged-in user
     // LAYER 2 → LAYER 4: Uses Spring Security's Authentication object to find the username, then calls UserRepository
@@ -185,8 +187,13 @@ public class MeController {
                 if (!passwordEncoder.matches(currentPw, user.getPasswordHash()))
                     return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect."));
 
+                // SECURITY (A07): Prevent password reuse
+                if (passwordEncoder.matches(newPw, user.getPasswordHash()))
+                    return ResponseEntity.badRequest().body(Map.of("error", "New password must be different from your current password."));
+
                 user.setPasswordHash(passwordEncoder.encode(newPw));
                 userRepository.save(user);
+                auditService.logSecurity(auth.getName(), "PASSWORD_CHANGED", "User changed their own password");
                 return ResponseEntity.ok(Map.of("message", "Password updated successfully."));
             })
             .orElse(ResponseEntity.status(401).body(Map.of("error", "User not found")));

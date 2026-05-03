@@ -3,6 +3,7 @@ import com.seminary.sms.entity.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,10 +50,12 @@ public interface StudentRepository extends JpaRepository<Student, Integer> {
     // Auto-generates: JOIN tblprogram ON ... WHERE tblprogram.fldProgramID = ?
     // Called by: DashboardController and StudentController to list or count students in a program
     List<Student> findByProgram_ProgramId(String programId);
+    List<Student> findByProgram_ProgramId(String programId, Sort sort);
 
     // Auto-generates: SELECT * FROM tblstudents WHERE fldCurrentStatus = ?
     // Called by: StudentController.getAll() when filtering the student list by status
     List<Student> findByCurrentStatus(Student.StudentStatus status);
+    List<Student> findByCurrentStatus(Student.StudentStatus status, Sort sort);
 
     // Auto-generates: SELECT COUNT(*) FROM tblstudents WHERE fldCurrentStatus = ?
     // Called by: DashboardController.getStats() to count students by enrollment status
@@ -65,6 +68,7 @@ public interface StudentRepository extends JpaRepository<Student, Integer> {
     // Auto-generates: WHERE fldCurrentStatus = ? AND tblprogram.fldProgramID = ?
     // Called by: StudentController to filter students by both status and program at the same time
     List<Student> findByCurrentStatusAndProgram_ProgramId(Student.StudentStatus status, String programId);
+    List<Student> findByCurrentStatusAndProgram_ProgramId(Student.StudentStatus status, String programId, Sort sort);
 
     // Auto-generates: JOIN tblprogram ... WHERE tblprogram.fldIndex = ? AND fldCurrentStatus = ?
     // Called by: lookups that filter students by program PK and status together

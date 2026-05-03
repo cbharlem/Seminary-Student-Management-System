@@ -23,10 +23,18 @@ package com.seminary.sms.controller;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,66 +62,155 @@ class PublicSubmissionController {
     }
 
     /**
-     * Receives a student's online admission form submission from apply.html.
+     * Receives a student's online admission form + required documents from apply.html.
      * No authentication required — this is the public entry point.
+     * Accepts multipart/form-data so files can be uploaded alongside text fields.
      *
-     * Validations performed:
-     *  - Required fields: firstName, lastName, dateOfBirth, email, seminaryLevel, appliedProgram.programId
-     *  - Email format (basic)
-     *  - Duplicate check: reject if this email already has a Pending submission
-     *
-     * On success: saves a new OnlineSubmission with status=Pending and returns the submissionId.
-     * SECURITY (A03): programId is resolved from the database — prevents sending arbitrary FK values.
+     * Required files: birthCertificate, baptismalCertificate, confirmationCertificate,
+     *                 reportCard, goodMoral (PDF / JPG / PNG, max 5 MB each).
+     * Files are saved to: uploads/submissions/{submissionId}/
+     * SECURITY (A03): programId resolved from DB; path traversal prevented in filenames.
      */
-    @PostMapping("/api/public/apply")
-    public ResponseEntity<?> submitApplication(@RequestBody OnlineSubmission submission) {
+    @PostMapping(value = "/api/public/apply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> submitApplication(
+            @RequestParam String firstName,
+            @RequestParam String lastName,
+            @RequestParam(required = false) String middleName,
+            @RequestParam String dateOfBirth,
+            @RequestParam(required = false) String placeOfBirth,
+            @RequestParam(required = false) String gender,
+            @RequestParam String email,
+            @RequestParam(required = false) String contactNumber,
+            @RequestParam(required = false) String nationality,
+            @RequestParam(required = false) String religion,
+            @RequestParam(required = false) String address,
+            @RequestParam(required = false) String fatherName,
+            @RequestParam(required = false) String fatherOccupation,
+            @RequestParam(required = false) String motherName,
+            @RequestParam(required = false) String motherOccupation,
+            @RequestParam(required = false) String guardianName,
+            @RequestParam(required = false) String guardianContact,
+            @RequestParam(required = false) String lastSchoolAttended,
+            @RequestParam(required = false) String lastSchoolYear,
+            @RequestParam(required = false) String lastYearLevel,
+            @RequestParam String seminaryLevel,
+            @RequestParam String appliedProgram,
+            @RequestParam MultipartFile birthCertificate,
+            @RequestParam MultipartFile baptismalCertificate,
+            @RequestParam MultipartFile confirmationCertificate,
+            @RequestParam MultipartFile reportCard,
+            @RequestParam MultipartFile goodMoral) {
+
         // ── Required field validation ─────────────────────────────────────────
-        if (isBlank(submission.getFirstName()))
-            return ResponseEntity.badRequest().body(Map.of("error", "First name is required."));
-        if (isBlank(submission.getLastName()))
-            return ResponseEntity.badRequest().body(Map.of("error", "Last name is required."));
-        if (submission.getDateOfBirth() == null)
-            return ResponseEntity.badRequest().body(Map.of("error", "Date of birth is required."));
-        if (isBlank(submission.getEmail()))
-            return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
-        if (!submission.getEmail().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
-            return ResponseEntity.badRequest().body(Map.of("error", "Please enter a valid email address."));
-        if (submission.getSeminaryLevel() == null)
-            return ResponseEntity.badRequest().body(Map.of("error", "Seminary level is required."));
-        if (submission.getAppliedProgram() == null || isBlank(submission.getAppliedProgram().getProgramId()))
-            return ResponseEntity.badRequest().body(Map.of("error", "Applied program is required."));
+        if (isBlank(firstName))      return bad("First name is required.");
+        if (isBlank(lastName))       return bad("Last name is required.");
+        if (isBlank(dateOfBirth))    return bad("Date of birth is required.");
+        if (isBlank(email))          return bad("Email is required.");
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) return bad("Please enter a valid email address.");
+        if (isBlank(seminaryLevel))  return bad("Seminary level is required.");
+        if (isBlank(appliedProgram)) return bad("Applied program is required.");
+
+        // ── File validation ───────────────────────────────────────────────────
+        if (isEmpty(birthCertificate))        return bad("Birth certificate is required.");
+        if (isEmpty(baptismalCertificate))    return bad("Baptismal certificate is required.");
+        if (isEmpty(confirmationCertificate)) return bad("Confirmation certificate is required.");
+        if (isEmpty(reportCard))              return bad("Report card is required.");
+        if (isEmpty(goodMoral))               return bad("Good moral certificate is required.");
+
+        String[] allowed = {"pdf", "jpg", "jpeg", "png"};
+        if (!validExt(birthCertificate, allowed))        return bad("Birth certificate must be PDF or image.");
+        if (!validExt(baptismalCertificate, allowed))    return bad("Baptismal certificate must be PDF or image.");
+        if (!validExt(confirmationCertificate, allowed)) return bad("Confirmation certificate must be PDF or image.");
+        if (!validExt(reportCard, allowed))              return bad("Report card must be PDF or image.");
+        if (!validExt(goodMoral, allowed))               return bad("Good moral certificate must be PDF or image.");
 
         // ── Duplicate pending check ───────────────────────────────────────────
-        // SECURITY (A03): Prevent the same email from flooding the queue
         if (submissionRepository.existsByEmailAndStatus(
-                submission.getEmail().trim(), OnlineSubmission.SubmissionStatus.Pending)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "error", "An application with this email address is already pending review. " +
-                          "Please wait for the registrar to process your existing submission."));
-        }
+                email.trim().toLowerCase(), OnlineSubmission.SubmissionStatus.Pending))
+            return bad("An application with this email is already pending review.");
 
         // ── Resolve program reference ─────────────────────────────────────────
-        // SECURITY (A03): Always look up the program from the database — never trust the full object from input
-        Program program = programRepository.findByProgramId(
-                submission.getAppliedProgram().getProgramId()).orElse(null);
-        if (program == null)
-            return ResponseEntity.badRequest().body(Map.of("error", "Selected program not found."));
+        Program program = programRepository.findByProgramId(appliedProgram.trim()).orElse(null);
+        if (program == null) return bad("Selected program not found.");
 
-        // ── Sanitize and build the submission ─────────────────────────────────
-        submission.setEmail(submission.getEmail().trim().toLowerCase());
-        submission.setFirstName(submission.getFirstName().trim());
-        submission.setLastName(submission.getLastName().trim());
-        if (submission.getMiddleName() != null) submission.setMiddleName(submission.getMiddleName().trim());
-        submission.setAppliedProgram(program);
-        submission.setStatus(OnlineSubmission.SubmissionStatus.Pending);
-
-        // Auto-generate SUB-#### id
+        // ── Generate submission ID ────────────────────────────────────────────
         Integer maxNum = submissionRepository.findMaxSubmissionIdNumber();
-        int nextNum = (maxNum == null) ? 1001 : (maxNum + 1);
-        submission.setSubmissionId("SUB-" + String.format("%04d", nextNum));
+        String submissionId = "SUB-" + String.format("%04d", (maxNum == null) ? 1001 : (maxNum + 1));
 
-        OnlineSubmission saved = submissionRepository.save(submission);
-        return ResponseEntity.ok(Map.of("submissionId", saved.getSubmissionId()));
+        // ── Save uploaded files ───────────────────────────────────────────────
+        try {
+            Path dir = Paths.get("uploads", "submissions", submissionId);
+            Files.createDirectories(dir);
+
+            String bcPath    = saveFile(dir, submissionId, "birth-certificate",        birthCertificate);
+            String bapPath   = saveFile(dir, submissionId, "baptismal-certificate",    baptismalCertificate);
+            String confPath  = saveFile(dir, submissionId, "confirmation-certificate", confirmationCertificate);
+            String rcPath    = saveFile(dir, submissionId, "report-card",              reportCard);
+            String gmPath    = saveFile(dir, submissionId, "good-moral",               goodMoral);
+
+            // ── Build and save the submission ─────────────────────────────────
+            Applicant.SeminaryLevel level;
+            try { level = Applicant.SeminaryLevel.valueOf(seminaryLevel); }
+            catch (IllegalArgumentException e) { return bad("Invalid seminary level."); }
+
+            OnlineSubmission submission = OnlineSubmission.builder()
+                .submissionId(submissionId)
+                .firstName(firstName.trim())
+                .middleName(isBlank(middleName) ? null : middleName.trim())
+                .lastName(lastName.trim())
+                .dateOfBirth(LocalDate.parse(dateOfBirth))
+                .placeOfBirth(isBlank(placeOfBirth) ? null : placeOfBirth.trim())
+                .gender(isBlank(gender) ? Applicant.Gender.Male : Applicant.Gender.valueOf(gender))
+                .email(email.trim().toLowerCase())
+                .contactNumber(isBlank(contactNumber) ? null : contactNumber.trim())
+                .nationality(isBlank(nationality) ? null : nationality.trim())
+                .religion(isBlank(religion) ? null : religion.trim())
+                .address(isBlank(address) ? null : address.trim())
+                .fatherName(isBlank(fatherName) ? null : fatherName.trim())
+                .fatherOccupation(isBlank(fatherOccupation) ? null : fatherOccupation.trim())
+                .motherName(isBlank(motherName) ? null : motherName.trim())
+                .motherOccupation(isBlank(motherOccupation) ? null : motherOccupation.trim())
+                .guardianName(isBlank(guardianName) ? null : guardianName.trim())
+                .guardianContact(isBlank(guardianContact) ? null : guardianContact.trim())
+                .lastSchoolAttended(isBlank(lastSchoolAttended) ? null : lastSchoolAttended.trim())
+                .lastSchoolYear(isBlank(lastSchoolYear) ? null : lastSchoolYear.trim())
+                .lastYearLevel(isBlank(lastYearLevel) ? null : lastYearLevel.trim())
+                .seminaryLevel(level)
+                .appliedProgram(program)
+                .birthCertificate(bcPath)
+                .baptismalCertificate(bapPath)
+                .confirmationCertificate(confPath)
+                .reportCard(rcPath)
+                .goodMoral(gmPath)
+                .status(OnlineSubmission.SubmissionStatus.Pending)
+                .build();
+
+            OnlineSubmission saved = submissionRepository.save(submission);
+            return ResponseEntity.ok(Map.of("submissionId", saved.getSubmissionId()));
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Submission failed: " + e.getMessage()));
+        }
+    }
+
+    private ResponseEntity<?> bad(String msg) {
+        return ResponseEntity.badRequest().body(Map.of("error", msg));
+    }
+
+    private boolean isEmpty(MultipartFile f) { return f == null || f.isEmpty(); }
+
+    private boolean validExt(MultipartFile f, String[] allowed) {
+        String ext = StringUtils.getFilenameExtension(f.getOriginalFilename());
+        if (ext == null) return false;
+        for (String a : allowed) if (a.equalsIgnoreCase(ext)) return true;
+        return false;
+    }
+
+    private String saveFile(Path dir, String subId, String docType, MultipartFile file) throws IOException {
+        String ext = StringUtils.getFilenameExtension(file.getOriginalFilename());
+        String filename = subId + "-" + docType + "." + (ext != null ? ext.toLowerCase() : "bin");
+        file.transferTo(dir.resolve(filename).toAbsolutePath());
+        return subId + "/" + filename;
     }
 
     /**
@@ -280,6 +377,26 @@ class RegistrarSubmissionsController {
         submissionRepository.save(submission);
 
         return ResponseEntity.ok(Map.of("applicantId", applicantId));
+    }
+
+    /**
+     * Serves an uploaded document file to the registrar for viewing/downloading.
+     * SECURITY: path traversal prevented — dots and slashes in id/filename are rejected.
+     */
+    @GetMapping("/{id}/files/{filename:.+}")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
+    public ResponseEntity<Resource> serveFile(
+            @PathVariable String id, @PathVariable String filename) throws IOException {
+        if (id.contains("..") || id.contains("/") || filename.contains(".."))
+            return ResponseEntity.badRequest().build();
+        Path filePath = Paths.get("uploads", "submissions", id, filename).normalize().toAbsolutePath();
+        Resource resource = new UrlResource(filePath.toUri());
+        if (!resource.exists()) return ResponseEntity.notFound().build();
+        String contentType = Files.probeContentType(filePath);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+            .body(resource);
     }
 
     /**

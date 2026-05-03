@@ -15,6 +15,7 @@ package com.seminary.sms.repository;
 
 import com.seminary.sms.entity.Instructor;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 public interface InstructorRepository extends JpaRepository<Instructor, Integer> {
@@ -30,4 +31,5 @@ public interface InstructorRepository extends JpaRepository<Instructor, Integer>
     // Auto-generates: SELECT * FROM tblinstructors WHERE fldIsActive = 1
     // Called by: SectionController.getInstructors() to populate the instructor dropdown for schedule assignment
     List<Instructor> findByIsActiveTrue();
+    List<Instructor> findByIsActiveTrue(Sort sort);
 }

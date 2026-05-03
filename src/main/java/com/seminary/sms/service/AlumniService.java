@@ -33,6 +33,7 @@ package com.seminary.sms.service;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +59,7 @@ public class AlumniService {
     // LAYER 2 → LAYER 3: Called by AlumniController.getAll() to list all alumni records
     // LAYER 3 → LAYER 4: Calls alumniRepository.findAll() — returns every row in tblalumni
     public List<Alumni> getAll() {
-        return alumniRepository.findAll();
+        return alumniRepository.findAll(Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 2 → LAYER 3: Utility method to look up an alumni record by the linked student's ID

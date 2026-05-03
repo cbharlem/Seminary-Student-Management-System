@@ -130,14 +130,31 @@ function filterTable(tbodyId, query) {
 }
 
 // ── Sort Table ────────────────────────────────────────────────
+const _sortOriginal = {};
+function clearSortCache(tbodyId) {
+  delete _sortOriginal[tbodyId];
+  const tbody = document.getElementById(tbodyId);
+  tbody?.closest('table')?.querySelectorAll('th.sortable').forEach(h => {
+    h.classList.remove('sort-asc', 'sort-desc');
+  });
+}
 function sortTable(tbodyId, colIndex, th) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
-  const isAsc = th.classList.contains('sort-asc');
+  const isAsc  = th.classList.contains('sort-asc');
+  const isDesc = th.classList.contains('sort-desc');
+  const table  = th.closest('table');
+  const hasActiveSort = !!table.querySelector('th.sort-asc, th.sort-desc');
+  if (!hasActiveSort) {
+    _sortOriginal[tbodyId] = tbody.innerHTML;
+  }
+  table.querySelectorAll('th.sortable').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+  if (isDesc) {
+    if (_sortOriginal[tbodyId] != null) tbody.innerHTML = _sortOriginal[tbodyId];
+    delete _sortOriginal[tbodyId];
+    return;
+  }
   const dir = isAsc ? 'desc' : 'asc';
-  th.closest('table').querySelectorAll('th.sortable').forEach(h => {
-    h.classList.remove('sort-asc', 'sort-desc');
-  });
   th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
   const rows = Array.from(tbody.querySelectorAll('tr'));
   rows.sort((a, b) => {

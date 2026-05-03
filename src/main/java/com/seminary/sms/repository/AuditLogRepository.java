@@ -17,4 +17,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AuditLogRepository extends JpaRepository<AuditLog, Integer> {
 
     Page<AuditLog> findAllByOrderByTimestampDesc(Pageable pageable);
+
+    Page<AuditLog> findByLogTypeOrderByTimestampDesc(AuditLog.LogType logType, Pageable pageable);
 }

@@ -29,6 +29,7 @@ package com.seminary.sms.service;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,7 +69,7 @@ public class EnrollmentService {
     // LAYER 2 → LAYER 3: Called by EnrollmentController.getAll() when a semester filter is provided
     // LAYER 3 → LAYER 4: Calls enrollmentRepository.findBySemester_SemesterId()
     public List<Enrollment> getBySemester(String semesterId) {
-        return enrollmentRepository.findBySemester_SemesterId(semesterId);
+        return enrollmentRepository.findBySemester_SemesterId(semesterId, Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 2 → LAYER 3: Utility method — counts how many students are enrolled in a given semester
@@ -83,6 +84,16 @@ public class EnrollmentService {
     // @Transactional: if any save fails, neither the enrollment nor the section assignment is committed
     @Transactional
     public Enrollment enroll(Student student, Program program, Semester semester, Section section, Integer yearLevel) {
+        // Block enrollment of graduated students
+        if (student.getCurrentStatus() == Student.StudentStatus.Alumni) {
+            throw new RuntimeException("Cannot enroll a graduated student.");
+        }
+
+        // Block enrollment when the registrar has closed the enrollment period
+        if (Boolean.FALSE.equals(semester.getEnrollmentOpen())) {
+            throw new RuntimeException("Enrollment for " + semester.getSemesterLabel() + " is currently closed.");
+        }
+
         // Check if already enrolled in this exact semester
         if (enrollmentRepository.findByStudent_StudentIdAndSemester_SemesterId(
                 student.getStudentId(), semester.getSemesterId()).isPresent()) {
@@ -208,6 +219,8 @@ public class EnrollmentService {
     @Transactional
     public List<EnrollmentSubject> enrollSubjectsBulk(Enrollment enrollment, List<Course> courses,
                                                        java.util.Map<String, String> overrideReasons) {
+        if (enrollment.getStudent().getCurrentStatus() == Student.StudentStatus.Alumni)
+            throw new RuntimeException("Cannot add subjects to the enrollment of a graduated student.");
         List<EnrollmentSubject> result = new ArrayList<>();
         for (Course course : courses) {
             String reason = overrideReasons != null ? overrideReasons.get(course.getCourseId()) : null;

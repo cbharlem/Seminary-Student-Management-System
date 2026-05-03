@@ -16,6 +16,7 @@ package com.seminary.sms.repository;
 
 import com.seminary.sms.entity.Room;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 public interface RoomRepository extends JpaRepository<Room, Integer> {
@@ -31,4 +32,5 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
     // Auto-generates: SELECT * FROM tblrooms WHERE fldIsActive = 1
     // Called by: SectionController.getRooms() to populate the room dropdown for schedule assignment
     List<Room> findByIsActiveTrue();
+    List<Room> findByIsActiveTrue(Sort sort);
 }

@@ -54,6 +54,9 @@ public class User {
     @Column(name = "fldIsActive", nullable = false, columnDefinition = "TINYINT")
     private Boolean isActive = true;
 
+    @Column(name = "fldEmail", length = 100)
+    private String email;
+
     @Lob
     @JsonIgnore
     @Column(name = "fldProfilePicture", columnDefinition = "LONGBLOB")

@@ -41,6 +41,7 @@ package com.seminary.sms.config;
 
 import com.seminary.sms.entity.User;
 import com.seminary.sms.repository.UserRepository;
+import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -55,8 +56,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -71,6 +70,7 @@ public class SecurityConfig {
 
     private final UserRepository userRepository;
     private final LoginAttemptService loginAttemptService;
+    private final AuditService auditService;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -101,6 +101,7 @@ public class SecurityConfig {
                 // Static files — always accessible (login page, CSS, JS)
                 .requestMatchers(
                     "/login.html", "/login", "/apply.html", "/check-status.html",
+                    "/forgot-password.html", "/reset-password.html",
                     "/css/**", "/js/**", "/images/**",
                     "/favicon.ico",
                     "/api/public/**"
@@ -144,7 +145,12 @@ public class SecurityConfig {
             // not set on static pages — GET logout is acceptable for a local system.
             .logout(logout -> logout
                 .logoutRequestMatcher(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/logout"))
-                .logoutSuccessUrl("/login.html?logout=true")
+                .logoutSuccessHandler((request, response, authentication) -> {
+                    if (authentication != null) {
+                        auditService.logSecurity(authentication.getName(), "LOGOUT", "User logged out");
+                    }
+                    response.sendRedirect("/login.html?logout=true");
+                })
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
                 .permitAll()
@@ -160,6 +166,7 @@ public class SecurityConfig {
     private AuthenticationSuccessHandler loginSuccessHandler() {
         return (request, response, authentication) -> {
             loginAttemptService.loginSucceeded(authentication.getName());
+            auditService.logSecurity(authentication.getName(), "LOGIN_SUCCESS", "User logged in successfully");
             response.sendRedirect("/index.html");
         };
     }
@@ -193,6 +200,7 @@ public class SecurityConfig {
             User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
             if (!user.getIsActive()) {
+                auditService.logSecurity(username, "INACTIVE_LOGIN_ATTEMPT", "Login attempted on a disabled account");
                 throw new UsernameNotFoundException("Account is inactive.");
             }
             return new org.springframework.security.core.userdetails.User(
@@ -201,11 +209,6 @@ public class SecurityConfig {
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
             );
         };
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 
     @Bean

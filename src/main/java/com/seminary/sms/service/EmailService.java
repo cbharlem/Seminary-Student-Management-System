@@ -44,4 +44,56 @@ public class EmailService {
             log.warn("Failed to send credentials email to {}: {}", toEmail, e.getMessage());
         }
     }
+
+    @Async
+    public void sendAccountLocked(String toEmail, String username, String resetLink) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromAddress);
+            message.setTo(toEmail);
+            message.setSubject("St. Francis de Sales Seminary — Account Temporarily Locked");
+            message.setText(
+                "Dear " + username + ",\n\n" +
+                "We detected multiple failed login attempts on your account. For your protection,\n" +
+                "your account has been temporarily locked for 15 minutes.\n\n" +
+                "If this was you, simply wait 15 minutes and try again.\n\n" +
+                "If this was NOT you, someone may be trying to access your account.\n" +
+                "You can bypass the lock and reset your password immediately by clicking the link below:\n\n" +
+                "  " + resetLink + "\n\n" +
+                "This link expires in 1 hour and can only be used once.\n\n" +
+                "If you did not request this, you may ignore this email — your account will unlock automatically.\n\n" +
+                "God bless,\n" +
+                "St. Francis de Sales Major Seminary\n" +
+                "Registrar's Office"
+            );
+            mailSender.send(message);
+            log.info("Account locked notification sent to {}", toEmail);
+        } catch (MailException e) {
+            log.warn("Failed to send lock notification to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendPasswordReset(String toEmail, String username, String resetLink) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromAddress);
+            message.setTo(toEmail);
+            message.setSubject("St. Francis de Sales Seminary — Password Reset Request");
+            message.setText(
+                "Dear " + username + ",\n\n" +
+                "A password reset was requested for your account. Click the link below to set a new password:\n\n" +
+                "  " + resetLink + "\n\n" +
+                "This link expires in 1 hour and can only be used once.\n\n" +
+                "If you did not request a password reset, you may safely ignore this email.\n\n" +
+                "God bless,\n" +
+                "St. Francis de Sales Major Seminary\n" +
+                "Registrar's Office"
+            );
+            mailSender.send(message);
+            log.info("Password reset email sent to {}", toEmail);
+        } catch (MailException e) {
+            log.warn("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
+        }
+    }
 }

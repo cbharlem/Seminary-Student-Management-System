@@ -103,6 +103,7 @@ public class StudentService {
             .username(username)
             .passwordHash(passwordEncoder.encode(tempPassword))
             .role(User.Role.Student)
+            .email(student.getEmail())
             .isActive(true)
             .build();
         user = userRepository.save(user);
@@ -119,6 +120,8 @@ public class StudentService {
     public void updateStatus(String studentId, Student.StudentStatus status) {
         Student s = studentRepository.findByStudentId(studentId)
             .orElseThrow(() -> new RuntimeException("Student not found: " + studentId));
+        if (s.getCurrentStatus() == Student.StudentStatus.Alumni)
+            throw new RuntimeException("Cannot change the status of a graduated student.");
         s.setCurrentStatus(status);
         studentRepository.save(s);
     }

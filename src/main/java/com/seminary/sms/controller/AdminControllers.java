@@ -45,6 +45,7 @@ import com.seminary.sms.service.AlumniService;
 import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -312,9 +313,9 @@ class SectionController {
     @GetMapping
     @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Section> getSections(@RequestParam(required = false) String semester) {
-        if (semester != null) return sectionRepository.findBySemester_SemesterId(semester)
+        if (semester != null) return sectionRepository.findBySemester_SemesterId(semester, Sort.by(Sort.Direction.DESC, "index"))
             .stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
-        return sectionRepository.findAll().stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
+        return sectionRepository.findAll(Sort.by(Sort.Direction.DESC, "index")).stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js saveSection() when adding a new section
@@ -369,7 +370,7 @@ class SectionController {
     @GetMapping("/instructors")
     @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Instructor> getInstructors() {
-        return instructorRepository.findByIsActiveTrue();
+        return instructorRepository.findByIsActiveTrue(Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js saveInstructor() when the registrar adds a new instructor
@@ -400,13 +401,25 @@ class SectionController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteInstructor() when the registrar confirms deletion
+    // LAYER 2 → LAYER 4: Soft-deletes by setting isActive = false (record is kept, hidden from lists)
+    @DeleteMapping("/instructors/{id}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<Void> deleteInstructor(@PathVariable String id) {
+        return instructorRepository.findByInstructorId(id).map(existing -> {
+            existing.setIsActive(false);
+            instructorRepository.save(existing);
+            return ResponseEntity.ok().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     // LAYER 1 → LAYER 2: Triggered by app.js loadRooms() and schedule modal dropdowns
     // LAYER 2 → LAYER 4: Returns only active rooms from RoomRepository
     // LAYER 2 → LAYER 1: Returns a JSON list of active Room objects
     @GetMapping("/rooms")
     @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Room> getRooms() {
-        return roomRepository.findByIsActiveTrue();
+        return roomRepository.findByIsActiveTrue(Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js saveRoom() when a new room is added
@@ -425,9 +438,24 @@ class SectionController {
     @PutMapping("/rooms/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<Room> updateRoom(@PathVariable String id, @RequestBody Room room) {
-        if (!roomRepository.existsByRoomId(id)) return ResponseEntity.notFound().build();
-        room.setRoomId(id);
-        return ResponseEntity.ok(roomRepository.save(room));
+        return roomRepository.findByRoomId(id).map(existing -> {
+            existing.setRoomName(room.getRoomName());
+            existing.setBuilding(room.getBuilding());
+            existing.setCapacity(room.getCapacity());
+            return ResponseEntity.ok(roomRepository.save(existing));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteRoom() when the registrar confirms deletion
+    // LAYER 2 → LAYER 4: Soft-deletes by setting isActive = false (record is kept, hidden from lists)
+    @DeleteMapping("/rooms/{id}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<Void> deleteRoom(@PathVariable String id) {
+        return roomRepository.findByRoomId(id).map(existing -> {
+            existing.setIsActive(false);
+            roomRepository.save(existing);
+            return ResponseEntity.ok().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
     }
 }
 
@@ -530,7 +558,7 @@ class UserController {
     @GetMapping
     @PreAuthorize("hasRole('Admin')")
     public List<User> getAll() {
-        return userRepository.findAll();
+        return userRepository.findAll(Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js saveUser() when the registrar creates a new login account
@@ -543,12 +571,14 @@ class UserController {
             return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
         }
         try {
+            String email = body.get("email");
             User user = User.builder()
                 .userId("USR-" + String.format("%04d", 1001 + userRepository.count()))
                 .username(body.get("username"))
                 .passwordHash(passwordEncoder.encode(body.get("password")))
                 // SECURITY (A08): Enum poisoning — wrap valueOf to return 400 on invalid role
                 .role(User.Role.valueOf(body.get("role")))
+                .email(email != null && !email.isBlank() ? email.trim() : null)
                 .isActive(true)
                 .build();
             User saved = userRepository.save(user);
@@ -688,6 +718,7 @@ class SchoolYearController {
         semester.setStartDate(LocalDate.parse((String) body.get("startDate")));
         semester.setEndDate(LocalDate.parse((String) body.get("endDate")));
         semester.setIsActive(false);
+        semester.setEnrollmentOpen(true);
         return ResponseEntity.ok(semesterRepository.save(semester));
     }
 
@@ -771,8 +802,17 @@ class AdminAuditController {
     @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<Map<String, Object>> getAuditLogs(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
-        var result = auditLogRepository.findAllByOrderByTimestampDesc(PageRequest.of(page, Math.min(size, 100)));
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String type) {
+        var pageable = PageRequest.of(page, Math.min(size, 100));
+        com.seminary.sms.entity.AuditLog.LogType logType = null;
+        try {
+            if (type != null && !type.isBlank())
+                logType = com.seminary.sms.entity.AuditLog.LogType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException ignored) {}
+        var result = (logType != null)
+            ? auditLogRepository.findByLogTypeOrderByTimestampDesc(logType, pageable)
+            : auditLogRepository.findAllByOrderByTimestampDesc(pageable);
         return ResponseEntity.ok(Map.of(
             "items", result.getContent(),
             "totalItems", result.getTotalElements(),

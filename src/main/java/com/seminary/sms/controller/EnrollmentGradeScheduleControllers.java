@@ -31,6 +31,7 @@ import com.seminary.sms.repository.*;
 import com.seminary.sms.service.*;
 import com.seminary.sms.service.AuditService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -73,7 +74,7 @@ class EnrollmentController {
     @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Enrollment> getAll(@RequestParam(required = false) String semester) {
         if (semester != null) return enrollmentService.getBySemester(semester);
-        return enrollmentRepository.findAll();
+        return enrollmentRepository.findAll(Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js viewStudent() to load enrollment history in the student detail panel
@@ -462,6 +463,36 @@ class EnrollmentController {
             return ResponseEntity.status(500).body(Map.of("error", "An unexpected error occurred."));
         }
     }
+
+    @PutMapping("/close-enrollment")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> closeEnrollment() {
+        try {
+            Semester active = semesterRepository.findByIsActiveTrue()
+                .orElseThrow(() -> new RuntimeException("No active semester found."));
+            active.setEnrollmentOpen(false);
+            semesterRepository.save(active);
+            auditService.log("UPDATE", "Semester", "Enrollment closed for " + active.getSemesterLabel());
+            return ResponseEntity.ok(Map.of("enrollmentOpen", false, "semesterLabel", active.getSemesterLabel()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/open-enrollment")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> openEnrollment() {
+        try {
+            Semester active = semesterRepository.findByIsActiveTrue()
+                .orElseThrow(() -> new RuntimeException("No active semester found."));
+            active.setEnrollmentOpen(true);
+            semesterRepository.save(active);
+            auditService.log("UPDATE", "Semester", "Enrollment reopened for " + active.getSemesterLabel());
+            return ResponseEntity.ok(Map.of("enrollmentOpen", true, "semesterLabel", active.getSemesterLabel()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }
 
 // ── Grades ────────────────────────────────────────────────────────────────────
@@ -473,6 +504,7 @@ class GradeController {
     private final GradeRepository gradeRepository;
     private final GradeService gradeService;
     private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
     private final AuditService auditService;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadGrades() to populate the grades management table
@@ -504,6 +536,11 @@ class GradeController {
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> save(@RequestBody Grade grade, Authentication auth) {
         try {
+            if (grade.getStudent() != null && grade.getStudent().getStudentId() != null) {
+                Student student = studentRepository.findByStudentId(grade.getStudent().getStudentId()).orElse(null);
+                if (student != null && student.getCurrentStatus() == Student.StudentStatus.Alumni)
+                    return ResponseEntity.badRequest().body(Map.of("error", "Cannot create grades for a graduated student."));
+            }
             User user = userRepository.findByUsername(auth.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
             Grade saved = gradeService.saveGrade(grade, user);

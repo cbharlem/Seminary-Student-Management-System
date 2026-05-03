@@ -16,6 +16,7 @@ package com.seminary.sms.repository;
 
 import com.seminary.sms.entity.Section;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 public interface SectionRepository extends JpaRepository<Section, Integer> {
@@ -31,6 +32,7 @@ public interface SectionRepository extends JpaRepository<Section, Integer> {
     // Auto-generates: JOIN tblsemester ON ... WHERE tblsemester.fldSemesterID = ?
     // Called by: SectionController.getSections() and EnrollmentController to list sections for a given semester
     List<Section> findBySemester_SemesterId(String semesterId);
+    List<Section> findBySemester_SemesterId(String semesterId, Sort sort);
 
     // Auto-generates: JOIN tblprogram ON ... WHERE tblprogram.fldIndex = ?
     // Called by: lookups that filter sections by program (by PK) for enrollment assignment

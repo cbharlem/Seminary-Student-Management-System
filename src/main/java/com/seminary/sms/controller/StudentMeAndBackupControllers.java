@@ -92,10 +92,16 @@ class GradeMeController {
      */
     @GetMapping("/student/me")
     @PreAuthorize("hasAnyRole('Registrar','Student')")
-    public ResponseEntity<?> getMyGrades(Authentication auth) {
+    public ResponseEntity<?> getMyGrades(Authentication auth,
+            @RequestParam(required = false) String semester) {
         return userRepository.findByUsername(auth.getName())
             .flatMap(u -> studentRepository.findByUser_UserId(u.getUserId()))
-            .map(s -> ResponseEntity.ok(gradeService.getGradesByStudent(s.getStudentId())))
+            .map(s -> {
+                var grades = (semester != null && !semester.isBlank())
+                    ? gradeService.getGradesByStudentAndSemester(s.getStudentId(), semester)
+                    : gradeService.getGradesByStudent(s.getStudentId());
+                return ResponseEntity.ok(grades);
+            })
             .orElse(ResponseEntity.notFound().build());
     }
 }

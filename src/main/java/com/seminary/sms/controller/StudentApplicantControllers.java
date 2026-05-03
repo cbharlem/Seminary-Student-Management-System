@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -51,13 +52,13 @@ class StudentController {
                 Student.StudentStatus st = Student.StudentStatus.valueOf(status);
                 if (program != null)
                     // LAYER 2 → LAYER 4: Simple filter — goes straight to Repository
-                    return ResponseEntity.ok(studentRepository.findByCurrentStatusAndProgram_ProgramId(st, program));
-                return ResponseEntity.ok(studentRepository.findByCurrentStatus(st));
+                    return ResponseEntity.ok(studentRepository.findByCurrentStatusAndProgram_ProgramId(st, program, Sort.by(Sort.Direction.DESC, "index")));
+                return ResponseEntity.ok(studentRepository.findByCurrentStatus(st, Sort.by(Sort.Direction.DESC, "index")));
             }
-            if (program != null) return ResponseEntity.ok(studentRepository.findByProgram_ProgramId(program));
+            if (program != null) return ResponseEntity.ok(studentRepository.findByProgram_ProgramId(program, Sort.by(Sort.Direction.DESC, "index")));
             // SECURITY (A05): Cap unfiltered results to prevent large query DoS
             // LAYER 4 → LAYER 2: Repository returns List<Student>, Spring converts to JSON → back to Layer 1
-            return ResponseEntity.ok(studentRepository.findAll(PageRequest.of(0, 500)).getContent());
+            return ResponseEntity.ok(studentRepository.findAll(PageRequest.of(0, 500, Sort.by(Sort.Direction.DESC, "index"))).getContent());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid status value."));
         }
@@ -92,8 +93,11 @@ class StudentController {
     // LAYER 2 → LAYER 1: Returns the updated Student JSON, or 404 if the ID is not found
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Student> update(@PathVariable String id, @RequestBody Student student) {
-        if (!studentRepository.existsByStudentId(id)) return ResponseEntity.notFound().build();
+    public ResponseEntity<?> update(@PathVariable String id, @RequestBody Student student) {
+        Student existing = studentRepository.findByStudentId(id).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
+        if (existing.getCurrentStatus() == Student.StudentStatus.Alumni)
+            return ResponseEntity.badRequest().body(Map.of("error", "Cannot modify the record of a graduated student."));
         student.setStudentId(id);
         resolveStudentRefs(student);
         return ResponseEntity.ok(studentService.save(student));
@@ -123,6 +127,8 @@ class StudentController {
             return ResponseEntity.ok(Map.of("message", "Status updated"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid status value."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }
@@ -149,7 +155,7 @@ class ApplicantController {
     @PreAuthorize("hasAnyRole('Registrar','Admin')")
     public List<Applicant> getAll() {
         // SECURITY (A05): Cap unfiltered results to prevent large query DoS
-        List<Applicant> applicants = applicantRepository.findAll(PageRequest.of(0, 500)).getContent();
+        List<Applicant> applicants = applicantRepository.findAll(PageRequest.of(0, 500, Sort.by(Sort.Direction.DESC, "index"))).getContent();
         // Build a map of applicantId -> applicationStatus in one query
         Map<String, String> statusMap = new HashMap<>();
         applicationRepository.findAll().forEach(app -> {

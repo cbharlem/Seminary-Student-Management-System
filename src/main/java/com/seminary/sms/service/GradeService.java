@@ -123,6 +123,8 @@ public class GradeService {
                               Grade.GradeStatus status, String remarks, User enteredBy) {
         Grade grade = gradeRepository.findByGradeId(gradeId)
             .orElseThrow(() -> new RuntimeException("Grade not found: " + gradeId));
+        if (grade.getStudent() != null && grade.getStudent().getCurrentStatus() == Student.StudentStatus.Alumni)
+            throw new RuntimeException("Cannot modify grades of a graduated student.");
         grade.setMidtermClassStanding(midtermClassStanding);
         grade.setMidtermExam(midtermExam);
         grade.setFinalClassStanding(finalClassStanding);

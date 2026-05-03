@@ -142,9 +142,9 @@
   <div id="nav-admin" style="display:none">
     <div class="sidebar-section">
       <div class="sidebar-label">Administration</div>
-      <div class="nav-item" onclick="gotoPage('audit-logs',this)" title="Audit Logs">
+      <div class="nav-item" onclick="gotoPage('audit-logs',this)" title="System Logs">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm-2 9H7v-2h4v2zm4-4H7v-2h8v2zm0-4H7V8h8v2z"/></svg>
-        <span class="nav-label">Audit Logs</span>
+        <span class="nav-label">System Logs</span>
       </div>
       <div class="nav-item" onclick="gotoPage('users',this)" title="User Accounts">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
@@ -234,7 +234,7 @@
       <table>
         <thead>
           <tr>
-            <th class="sortable" onclick="sortTable('tbl-submissions',0,this)">Sub ID</th>
+            <th>Sub ID</th>
             <th class="sortable" onclick="sortTable('tbl-submissions',1,this)">Full Name</th>
             <th class="sortable" onclick="sortTable('tbl-submissions',2,this)">Level</th>
             <th class="sortable" onclick="sortTable('tbl-submissions',3,this)">Program</th>
@@ -286,7 +286,7 @@
         </select>
       </div>
     </div>
-    <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-applicants',0,this)">ID</th><th class="sortable" onclick="sortTable('tbl-applicants',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-applicants',2,this)">Level</th><th class="sortable" onclick="sortTable('tbl-applicants',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-applicants',4,this)">Status</th></tr></thead><tbody id="tbl-applicants"><tr><td colspan="5" class="empty-state" style="text-align:center">Loading...</td></tr></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>ID</th><th class="sortable" onclick="sortTable('tbl-applicants',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-applicants',2,this)">Level</th><th class="sortable" onclick="sortTable('tbl-applicants',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-applicants',4,this)">Status</th></tr></thead><tbody id="tbl-applicants"><tr><td colspan="5" class="empty-state" style="text-align:center">Loading...</td></tr></tbody></table></div>
   </div>
 </div>
 
@@ -294,7 +294,14 @@
 <div id="page-enrollment" class="page">
   <div class="page-header">
     <div><h2>Enrollment</h2><p id="enroll-sem-label">Active Semester</p></div>
-    <button class="btn btn-primary registrar-only" onclick="openEnrollModal()">+ Enroll Student</button>
+    <div class="enroll-header-actions">
+      <div id="enroll-status-badge" class="enroll-status-badge enroll-status-open" style="display:none">
+        <span class="enroll-status-dot"></span><span id="enroll-status-text">Enrollment Open</span>
+      </div>
+      <button id="btn-close-enrollment" class="btn btn-outline registrar-only" style="display:none" onclick="toggleEnrollmentStatus(false)">Close Enrollment</button>
+      <button id="btn-open-enrollment" class="btn btn-primary registrar-only" style="display:none" onclick="toggleEnrollmentStatus(true)">Reopen Enrollment</button>
+      <button id="btn-enroll-student" class="btn btn-primary registrar-only" onclick="openEnrollModal()">+ Enroll Student</button>
+    </div>
   </div>
   <div class="card">
     <div class="card-header"><h3>Enrolled Students</h3>
@@ -303,7 +310,7 @@
         <input class="search-input" placeholder="Search…" oninput="filterTable('tbl-enrollment',this.value)"/>
       </div>
     </div>
-    <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-enrollment',0,this)">Enrollment ID</th><th class="sortable" onclick="sortTable('tbl-enrollment',1,this)">Student</th><th class="sortable" onclick="sortTable('tbl-enrollment',2,this)">Program</th><th class="sortable" onclick="sortTable('tbl-enrollment',3,this)">Year</th><th class="sortable" onclick="sortTable('tbl-enrollment',4,this)">Date</th><th class="sortable" onclick="sortTable('tbl-enrollment',5,this)">Status</th></tr></thead><tbody id="tbl-enrollment"><tr><td colspan="6" style="text-align:center;color:var(--gray-400);padding:20px">Loading...</td></tr></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>Enrollment ID</th><th class="sortable" onclick="sortTable('tbl-enrollment',1,this)">Student</th><th class="sortable" onclick="sortTable('tbl-enrollment',2,this)">Program</th><th class="sortable" onclick="sortTable('tbl-enrollment',3,this)">Year</th><th class="sortable" onclick="sortTable('tbl-enrollment',4,this)">Date</th><th class="sortable" onclick="sortTable('tbl-enrollment',5,this)">Status</th></tr></thead><tbody id="tbl-enrollment"><tr><td colspan="6" style="text-align:center;color:var(--gray-400);padding:20px">Loading...</td></tr></tbody></table></div>
   </div>
 </div>
 
@@ -329,7 +336,7 @@
         </select>
       </div>
     </div>
-    <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-students',0,this)">Student ID</th><th class="sortable" onclick="sortTable('tbl-students',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-students',2,this)">Level</th><th class="sortable" onclick="sortTable('tbl-students',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-students',4,this)">Year</th><th class="sortable" onclick="sortTable('tbl-students',5,this)">Status</th></tr></thead><tbody id="tbl-students"><tr><td colspan="6" style="text-align:center;color:var(--gray-400);padding:20px">Loading...</td></tr></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>Student ID</th><th class="sortable" onclick="sortTable('tbl-students',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-students',2,this)">Level</th><th class="sortable" onclick="sortTable('tbl-students',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-students',4,this)">Year</th><th class="sortable" onclick="sortTable('tbl-students',5,this)">Status</th></tr></thead><tbody id="tbl-students"><tr><td colspan="6" style="text-align:center;color:var(--gray-400);padding:20px">Loading...</td></tr></tbody></table></div>
   </div>
 </div>
 
@@ -382,7 +389,7 @@
     <div class="card-header"><h3>All Alumni</h3>
       <input class="search-input" placeholder="Search…" oninput="filterTable('tbl-alumni',this.value)"/>
     </div>
-    <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-alumni',0,this)">Alumni ID</th><th class="sortable" onclick="sortTable('tbl-alumni',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-alumni',2,this)">Program</th><th class="sortable" onclick="sortTable('tbl-alumni',3,this)">Graduated</th><th class="sortable" onclick="sortTable('tbl-alumni',4,this)">Honors</th><th class="sortable" onclick="sortTable('tbl-alumni',5,this)">Current Ministry</th><th>Actions</th></tr></thead><tbody id="tbl-alumni"></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>Alumni ID</th><th class="sortable" onclick="sortTable('tbl-alumni',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-alumni',2,this)">Program</th><th class="sortable" onclick="sortTable('tbl-alumni',3,this)">Graduated</th><th>Honors</th><th>Current Ministry</th><th>Actions</th></tr></thead><tbody id="tbl-alumni"></tbody></table></div>
   </div>
 </div>
 
@@ -452,7 +459,7 @@
     <button class="btn btn-primary registrar-only" onclick="openSectionModal(null)">+ Add Section</button>
   </div>
   <div class="card"><div class="card-header"><h3>All Sections</h3></div>
-    <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-sections',0,this)">ID</th><th class="sortable" onclick="sortTable('tbl-sections',1,this)">Code</th><th class="sortable" onclick="sortTable('tbl-sections',2,this)">Name</th><th class="sortable" onclick="sortTable('tbl-sections',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-sections',4,this)">Year</th><th class="sortable" onclick="sortTable('tbl-sections',5,this)">Semester</th><th class="sortable" onclick="sortTable('tbl-sections',6,this)">Capacity</th><th>Actions</th></tr></thead><tbody id="tbl-sections"></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>ID</th><th class="sortable" onclick="sortTable('tbl-sections',1,this)">Code</th><th class="sortable" onclick="sortTable('tbl-sections',2,this)">Name</th><th class="sortable" onclick="sortTable('tbl-sections',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-sections',4,this)">Year</th><th>Semester</th><th class="sortable" onclick="sortTable('tbl-sections',6,this)">Capacity</th><th>Actions</th></tr></thead><tbody id="tbl-sections"></tbody></table></div>
   </div>
 </div>
 
@@ -513,7 +520,7 @@
   <div class="card"><div class="card-header"><h3>All Instructors</h3>
     <input class="search-input" placeholder="Search…" oninput="filterTable('tbl-instructors',this.value)"/>
   </div>
-  <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-instructors',0,this)">ID</th><th class="sortable" onclick="sortTable('tbl-instructors',1,this)">Name</th><th class="sortable" onclick="sortTable('tbl-instructors',2,this)">Email</th><th class="sortable" onclick="sortTable('tbl-instructors',3,this)">Specialization</th><th class="sortable" onclick="sortTable('tbl-instructors',4,this)">Status</th><th>Actions</th></tr></thead><tbody id="tbl-instructors"></tbody></table></div>
+  <div class="card-body"><table><thead><tr><th>ID</th><th class="sortable" onclick="sortTable('tbl-instructors',1,this)">Name</th><th>Email</th><th class="sortable" onclick="sortTable('tbl-instructors',3,this)">Specialization</th><th class="sortable" onclick="sortTable('tbl-instructors',4,this)">Status</th><th>Actions</th></tr></thead><tbody id="tbl-instructors"></tbody></table></div>
   </div>
 </div>
 
@@ -521,10 +528,10 @@
 <div id="page-rooms" class="page">
   <div class="page-header">
     <div><h2>Rooms</h2><p>Manage classrooms and facilities</p></div>
-    <button class="btn btn-primary registrar-only" onclick="openModal('modal-room')">+ Add Room</button>
+    <button class="btn btn-primary registrar-only" onclick="clearRoomForm(); openModal('modal-room')">+ Add Room</button>
   </div>
   <div class="card"><div class="card-header"><h3>All Rooms</h3></div>
-    <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-rooms',0,this)">Room ID</th><th class="sortable" onclick="sortTable('tbl-rooms',1,this)">Room Name</th><th class="sortable" onclick="sortTable('tbl-rooms',2,this)">Building</th><th class="sortable" onclick="sortTable('tbl-rooms',3,this)">Capacity</th><th class="sortable" onclick="sortTable('tbl-rooms',4,this)">Status</th></tr></thead><tbody id="tbl-rooms"></tbody></table></div>
+    <div class="card-body"><table><thead><tr><th>Room ID</th><th class="sortable" onclick="sortTable('tbl-rooms',1,this)">Room Name</th><th class="sortable" onclick="sortTable('tbl-rooms',2,this)">Building</th><th class="sortable" onclick="sortTable('tbl-rooms',3,this)">Capacity</th><th class="sortable" onclick="sortTable('tbl-rooms',4,this)">Status</th><th>Actions</th></tr></thead><tbody id="tbl-rooms"></tbody></table></div>
   </div>
 </div>
 
@@ -547,7 +554,7 @@
   <div class="card"><div class="card-header"><h3>All Users</h3>
     <input class="search-input" placeholder="Search…" oninput="filterTable('tbl-users',this.value)"/>
   </div>
-  <div class="card-body"><table><thead><tr><th class="sortable" onclick="sortTable('tbl-users',0,this)">ID</th><th class="sortable" onclick="sortTable('tbl-users',1,this)">Username</th><th class="sortable" onclick="sortTable('tbl-users',2,this)">Role</th><th class="sortable" onclick="sortTable('tbl-users',3,this)">Status</th><th>Actions</th></tr></thead><tbody id="tbl-users"></tbody></table></div>
+  <div class="card-body"><table><thead><tr><th>ID</th><th class="sortable" onclick="sortTable('tbl-users',1,this)">Username</th><th class="sortable" onclick="sortTable('tbl-users',2,this)">Role</th><th class="sortable" onclick="sortTable('tbl-users',3,this)">Status</th><th>Actions</th></tr></thead><tbody id="tbl-users"></tbody></table></div>
   </div>
 </div>
 
@@ -577,15 +584,20 @@
 <div id="page-audit-logs" class="page">
   <div class="page-header">
     <div>
-      <h2>Audit Logs</h2>
-      <p>Full history of all significant actions performed in the system — Admin only</p>
+      <h2>System Logs</h2>
+      <p>Full history of all actions and security events in the system — Admin only</p>
     </div>
     <button class="btn btn-outline" onclick="loadAuditLog()">↻ Refresh</button>
   </div>
   <div class="card">
-    <div class="card-header">
-      <div class="search-bar">
-        <input class="search-input" placeholder="Search by user, action, or entity…" oninput="filterTable('tbl-audit-log',this.value)"/>
+    <div class="card-header" style="flex-direction:column;align-items:flex-start;gap:12px">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm audit-filter-tab active" onclick="setAuditFilter(null,this)">All</button>
+        <button class="btn btn-sm audit-filter-tab" onclick="setAuditFilter('AUDIT',this)">Audit</button>
+        <button class="btn btn-sm audit-filter-tab" onclick="setAuditFilter('SECURITY',this)">Security</button>
+      </div>
+      <div class="search-bar" style="width:100%">
+        <input class="search-input" placeholder="Search by user, action, or detail…" oninput="filterTable('tbl-audit-log',this.value)"/>
       </div>
     </div>
     <div class="card-body">
@@ -595,10 +607,10 @@
             <th class="sortable" onclick="sortTable('tbl-audit-log',0,this)">Timestamp</th>
             <th class="sortable" onclick="sortTable('tbl-audit-log',1,this)">User</th>
             <th class="sortable" onclick="sortTable('tbl-audit-log',2,this)">Role</th>
-            <th class="sortable" onclick="sortTable('tbl-audit-log',3,this)">Action</th>
-            <th class="sortable" onclick="sortTable('tbl-audit-log',4,this)">Entity</th>
+            <th>Type</th>
+            <th class="sortable" onclick="sortTable('tbl-audit-log',4,this)">Action</th>
             <th>Detail</th>
-            <th class="sortable" onclick="sortTable('tbl-audit-log',6,this)">IP Address</th>
+            <th>IP Address</th>
           </tr>
         </thead>
         <tbody id="tbl-audit-log">
@@ -612,18 +624,24 @@
 
 <!-- ▸ MY GRADES (Student) ────────────────────────────────────── -->
 <div id="page-my-grades" class="page">
+  <div id="student-enroll-notice" class="student-enroll-notice" style="display:none"></div>
   <div class="student-grades-banner">
     <div><h3>Academic Record</h3><p id="my-grades-sub" style="opacity:.65;font-size:.85rem;margin-top:4px">Loading...</p>
       <div class="gpa-chip"><div class="gv" id="my-gwa">—</div><div class="gl">General Weighted Average</div></div>
     </div>
   </div>
-  <div class="card"><div class="card-header"><h3 id="my-grades-sem">Grades</h3></div>
+  <div class="card">
+    <div class="card-header">
+      <h3 id="my-grades-sem">Grades</h3>
+      <select id="my-grades-sem-filter" class="form-select" onchange="filterMyGradesBySem()"></select>
+    </div>
     <div class="card-body"><table><thead><tr><th>Code</th><th>Course Name</th><th>Units</th><th>Midterm</th><th>Final</th><th>Rating</th><th>Status</th></tr></thead><tbody id="tbl-my-grades"><tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:20px">Loading...</td></tr></tbody></table></div>
   </div>
 </div>
 
 <!-- ▸ MY SCHEDULE (Student) ──────────────────────────────────── -->
 <div id="page-my-schedule" class="page">
+  <div id="student-enroll-notice-sched" class="student-enroll-notice" style="display:none"></div>
   <div class="page-header"><div><h2>My Schedule</h2><p id="my-sched-sub">Loading...</p></div></div>
   <div class="card card-pad">
     <div class="sched-grid">
@@ -744,6 +762,15 @@
       <div class="field full"><label>Last School Attended</label><input id="sv-school" readonly class="input-readonly"/></div>
       <div class="field"><label>School Year</label><input id="sv-school-year" readonly class="input-readonly"/></div>
       <div class="field"><label>Year Level</label><input id="sv-year-level" readonly class="input-readonly"/></div>
+    </div>
+
+    <div class="sec-divider">Submitted Documents</div>
+    <div id="sv-docs-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:4px">
+      <div class="field"><label>Birth Certificate</label><div id="sv-doc-birth" class="sv-doc-link">—</div></div>
+      <div class="field"><label>Baptismal Certificate</label><div id="sv-doc-baptismal" class="sv-doc-link">—</div></div>
+      <div class="field"><label>Confirmation Certificate</label><div id="sv-doc-confirmation" class="sv-doc-link">—</div></div>
+      <div class="field"><label>Report Card (Form 138)</label><div id="sv-doc-reportcard" class="sv-doc-link">—</div></div>
+      <div class="field"><label>Good Moral Certificate</label><div id="sv-doc-goodmoral" class="sv-doc-link">—</div></div>
     </div>
 
     <!-- Rejection reason (shown only when already rejected) -->
@@ -1130,6 +1157,30 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-instructor-delete">
+  <div class="modal" style="max-width:420px">
+    <h3>Delete Instructor</h3>
+    <p class="modal-sub">This will deactivate the instructor record. This cannot be undone.</p>
+    <input type="hidden" id="del-instructor-id"/>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-instructor-delete')">Cancel</button>
+      <button class="btn btn-danger registrar-only" onclick="confirmDeleteInstructor()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-room-delete">
+  <div class="modal" style="max-width:420px">
+    <h3>Delete Room</h3>
+    <p class="modal-sub">This will deactivate the room record. This cannot be undone.</p>
+    <input type="hidden" id="del-room-id"/>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-room-delete')">Cancel</button>
+      <button class="btn btn-danger registrar-only" onclick="confirmDeleteRoom()">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- Unmark Alumni Confirmation -->
 <div class="modal-overlay" id="modal-unmark-alumni">
   <div class="modal" style="max-width:420px">
@@ -1225,15 +1276,15 @@
 <!-- Room -->
 <div class="modal-overlay" id="modal-room">
   <div class="modal">
-    <h3>Add / Edit Room</h3><p class="modal-sub">Manage classrooms and venues</p>
+    <h3 id="rm-modal-title">Add Room</h3><p class="modal-sub">Manage classrooms and venues</p>
+    <input type="hidden" id="rm-id"/>
     <div class="modal-grid">
-      <div class="field"><label for="rm-id">Room ID <span style="color:var(--danger)">*</span></label><input id="rm-id" placeholder="e.g. RM-101" required/></div>
       <div class="field"><label for="rm-name">Room Name <span style="color:var(--danger)">*</span></label><input id="rm-name" placeholder="e.g. Lecture Hall A" required/></div>
       <div class="field"><label for="rm-building">Building</label><input id="rm-building" placeholder="e.g. Main Building"/></div>
       <div class="field"><label for="rm-capacity">Capacity</label><input id="rm-capacity" type="number" placeholder="e.g. 30"/></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('modal-room')">Cancel</button>
+      <button class="btn btn-outline" onclick="clearRoomForm(); closeModal('modal-room')">Cancel</button>
       <button class="btn btn-primary registrar-only" onclick="saveRoom()">Save</button>
     </div>
   </div>
@@ -1246,6 +1297,7 @@
     <div class="modal-grid">
       <div class="field"><label for="usr-username">Username <span style="color:var(--danger)">*</span></label><input id="usr-username" placeholder="e.g. S2026-001" required/></div>
       <div class="field"><label for="usr-role">Role <span style="color:var(--danger)">*</span></label><select id="usr-role" required><option value="Student">Student</option><option value="Registrar">Registrar</option></select></div>
+      <div class="field full"><label for="usr-email">Email <span style="font-size:.75rem;color:var(--gray-500);font-weight:400">(for password reset)</span></label><input id="usr-email" type="email" placeholder="e.g. juan@email.com"/></div>
       <div class="field"><label for="usr-password">Password <span style="color:var(--danger)">*</span></label><input id="usr-password" type="password" required/></div>
       <div class="field"><label for="usr-password2">Confirm Password <span style="color:var(--danger)">*</span></label><input id="usr-password2" type="password" required/></div>
     </div>
@@ -1316,6 +1368,18 @@
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-graduate')">Cancel</button>
       <button class="btn btn-danger registrar-only" onclick="graduateStudent()">Confirm Graduation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Enrollment Open/Close Confirmation -->
+<div class="modal-overlay" id="modal-enrollment-toggle">
+  <div class="modal">
+    <h3 id="enr-toggle-title">Close Enrollment</h3>
+    <p class="modal-sub" id="enr-toggle-sub"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-enrollment-toggle')">Cancel</button>
+      <button id="btn-enr-toggle-confirm" class="btn btn-danger" onclick="doToggleEnrollmentStatus()">Close Enrollment</button>
     </div>
   </div>
 </div>

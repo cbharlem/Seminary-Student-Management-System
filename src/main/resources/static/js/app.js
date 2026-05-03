@@ -51,6 +51,7 @@ function validateRequired(fields) {
 
 // ── State ─────────────────────────────────────────────────────
 let _instructorCache = {};
+let _roomCache = {};
 let _enrStudents = [];
 let _allEnrSections = [];
 let _currentStudentId = null;
@@ -160,6 +161,8 @@ async function init() {
       document.getElementById('dash-sem') && (document.getElementById('dash-sem').textContent = sem.semesterLabel);
       document.getElementById('enroll-sem-label') && (document.getElementById('enroll-sem-label').textContent = sem.semesterLabel);
       document.getElementById('my-sched-sub') && (document.getElementById('my-sched-sub').textContent = sem.semesterLabel);
+      // Show enrollment open/closed notice on student pages
+      if (SMS.role === 'Student') renderStudentEnrollmentNotice(sem);
     }
   } catch (_) {}
 
@@ -220,6 +223,7 @@ async function loadApplicants() {
         ? data.filter(a => (a.applicationStatus || 'Applied') === statusFilter)
         : data;
     const tbody = document.getElementById('tbl-applicants');
+    clearSortCache('tbl-applicants');
     if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No applicants found.</p></div></td></tr>'; return; }
     tbody.innerHTML = filtered.map(a =>
       `<tr style="cursor:pointer" onclick="viewApplicantDetail('${escHtml(a.applicantId)}')">
@@ -248,11 +252,14 @@ async function loadEnrollment() {
     } catch (_) {}
     if (SMS.activeSemester) filterEl.value = SMS.activeSemester.semesterId;
   }
+  // Render enrollment open/close status badge and toggle buttons
+  renderEnrollmentStatusBadge(SMS.activeSemester);
   try {
     const selected = filterEl?.value;
     const url = selected ? `/api/enrollment?semester=${selected}` : '/api/enrollment';
     const data = await api(url);
     const tbody = document.getElementById('tbl-enrollment');
+    clearSortCache('tbl-enrollment');
     const active = data.filter(e => e.student?.currentStatus !== 'Alumni');
     if (!active.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No enrollments found.</p></div></td></tr>'; return; }
     tbody.innerHTML = active.map(e =>
@@ -266,6 +273,74 @@ async function loadEnrollment() {
       </tr>`
     ).join('');
   } catch (e) { console.error(e); }
+}
+
+function renderEnrollmentStatusBadge(sem) {
+  const badge    = document.getElementById('enroll-status-badge');
+  const text     = document.getElementById('enroll-status-text');
+  const btnClose = document.getElementById('btn-close-enrollment');
+  const btnOpen  = document.getElementById('btn-open-enrollment');
+  const btnEnroll = document.getElementById('btn-enroll-student');
+  if (!badge) return;
+  const isOpen = !sem || sem.enrollmentOpen !== false;
+  badge.style.display = 'flex';
+  badge.className = 'enroll-status-badge ' + (isOpen ? 'enroll-status-open' : 'enroll-status-closed');
+  text.textContent  = isOpen ? 'Enrollment Open' : 'Enrollment Closed';
+  if (btnClose)  btnClose.style.display  = isOpen  ? '' : 'none';
+  if (btnOpen)   btnOpen.style.display   = !isOpen ? '' : 'none';
+  if (btnEnroll) btnEnroll.style.display = isOpen  ? '' : 'none';
+}
+
+let _enrollmentToggleTarget = null;
+
+function toggleEnrollmentStatus(open) {
+  _enrollmentToggleTarget = open;
+  const label = SMS.activeSemester?.semesterLabel || 'this semester';
+  const title  = document.getElementById('enr-toggle-title');
+  const sub    = document.getElementById('enr-toggle-sub');
+  const btn    = document.getElementById('btn-enr-toggle-confirm');
+  if (open) {
+    title.textContent   = 'Reopen Enrollment';
+    sub.textContent     = `This will allow new students to be enrolled in ${label}. You can close it again at any time.`;
+    btn.textContent     = 'Reopen Enrollment';
+    btn.className       = 'btn btn-primary';
+  } else {
+    title.textContent   = 'Close Enrollment';
+    sub.textContent     = `This will prevent new students from being enrolled in ${label}. You can reopen it later for late enrollees.`;
+    btn.textContent     = 'Close Enrollment';
+    btn.className       = 'btn btn-danger';
+  }
+  openModal('modal-enrollment-toggle');
+}
+
+async function doToggleEnrollmentStatus() {
+  const open  = _enrollmentToggleTarget;
+  const label = SMS.activeSemester?.semesterLabel || 'this semester';
+  closeModal('modal-enrollment-toggle');
+  try {
+    const endpoint = open ? '/api/enrollment/open-enrollment' : '/api/enrollment/close-enrollment';
+    await api(endpoint, 'PUT');
+    SMS.activeSemester = { ...SMS.activeSemester, enrollmentOpen: open };
+    renderEnrollmentStatusBadge(SMS.activeSemester);
+    toast(`Enrollment ${open ? 'reopened' : 'closed'} for ${label}.`);
+  } catch (e) {
+    toast(e.message || 'Failed to update enrollment status.', 'error');
+  }
+}
+
+function renderStudentEnrollmentNotice(sem) {
+  const ids = ['student-enroll-notice', 'student-enroll-notice-sched'];
+  const isOpen = sem && sem.enrollmentOpen !== false;
+  const html = isOpen
+    ? `<span class="enroll-notice-dot enroll-notice-open"></span>Enrollment for <strong>${escHtml(sem.semesterLabel)}</strong> is currently <strong>open</strong>.`
+    : `<span class="enroll-notice-dot enroll-notice-closed"></span>Enrollment for <strong>${escHtml(sem.semesterLabel)}</strong> is currently <strong>closed</strong>. Contact the registrar for late enrollment.`;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = html;
+    el.className = 'student-enroll-notice ' + (isOpen ? 'notice-open' : 'notice-closed');
+    el.style.display = 'flex';
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -304,6 +379,7 @@ async function searchStudents(q) {
 //   came from the Student entity (Layer 5) all the way up through the layers.
 function renderStudentTable(data) {
   const tbody = document.getElementById('tbl-students');
+  clearSortCache('tbl-students');
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No students found.</p></div></td></tr>'; return; }
   tbody.innerHTML = data.map(s =>
     `<tr style="cursor:pointer" onclick="viewStudent('${escHtml(s.studentId)}')">
@@ -351,6 +427,24 @@ async function viewStudent(id) {
       `<tr><td>${escHtml(e.semester?.semesterLabel)}</td><td>${escHtml(e.program?.programCode)}</td><td>${escHtml(e.yearLevel)}</td><td>${badge(e.enrollmentStatus)}</td></tr>`
     ).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--gray-400)">No history</td></tr>';
 
+    const isAlumni = s.currentStatus === 'Alumni';
+
+    document.getElementById('btn-edit-student').style.display = isAlumni ? 'none' : '';
+    document.getElementById('btn-graduate').style.display    = isAlumni ? 'none' : '';
+
+    const uploadBtn = document.querySelector('#page-student-detail .registrar-only[onclick*="modal-upload-doc"]');
+    if (uploadBtn) uploadBtn.style.display = isAlumni ? 'none' : '';
+
+    let notice = document.getElementById('sd-alumni-notice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'sd-alumni-notice';
+      notice.className = 'alumni-notice';
+      notice.textContent = 'This student has graduated. The record is view-only.';
+      document.getElementById('sd-badges').insertAdjacentElement('afterend', notice);
+    }
+    notice.style.display = isAlumni ? '' : 'none';
+
     gotoPage('student-detail', null);
   } catch (e) { toast('Failed to load student record', 'error'); }
 }
@@ -364,6 +458,7 @@ async function loadAlumni() {
   try {
     const data = await api('/api/alumni');
     const tbody = document.getElementById('tbl-alumni');
+    clearSortCache('tbl-alumni');
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No alumni records yet. Graduated students will appear here.</p></div></td></tr>'; return; }
     tbody.innerHTML = data.map(a =>
       `<tr><td>${escHtml(a.alumniId)}</td><td>${escHtml(a.student?.firstName)} ${escHtml(a.student?.lastName)}</td><td>${escHtml(a.program?.programCode)}</td><td>${fmtDate(a.graduationDate)}</td><td>${escHtml(a.honors || '—')}</td><td>${escHtml(a.currentMinistry || '—')}</td>
@@ -507,6 +602,7 @@ async function loadSections() {
   try {
     const data = await api('/api/sections');
     const tbody = document.getElementById('tbl-sections');
+    clearSortCache('tbl-sections');
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>No sections found.</p></div></td></tr>'; return; }
     tbody.innerHTML = data.map(s =>
       `<tr>
@@ -771,13 +867,17 @@ async function loadInstructors() {
   try {
     const data = await api('/api/sections/instructors');
     const tbody = document.getElementById('tbl-instructors');
+    clearSortCache('tbl-instructors');
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No instructors found.</p></div></td></tr>'; return; }
     _instructorCache = {};
     data.forEach(i => { _instructorCache[i.instructorId] = i; });
     tbody.innerHTML = data.map(i =>
       `<tr><td>${escHtml(i.instructorId)}</td><td>${escHtml(i.firstName)} ${escHtml(i.lastName)}</td><td>${escHtml(i.email || '—')}</td><td>${escHtml(i.specialization || '—')}</td>
       <td>${badge(i.isActive ? 'Active' : 'Inactive', i.isActive ? 'success' : 'gray')}</td>
-      <td><button class="btn btn-outline btn-sm registrar-only" onclick="editInstructor('${escHtml(i.instructorId)}')">Edit</button></td></tr>`
+      <td>
+        <button class="btn btn-outline btn-sm registrar-only" onclick="editInstructor('${escHtml(i.instructorId)}')">Edit</button>
+        <button class="btn btn-danger btn-sm registrar-only" onclick="deleteInstructor('${escHtml(i.instructorId)}')">Delete</button>
+      </td></tr>`
     ).join('');
   } catch (e) { console.error(e); }
 }
@@ -786,10 +886,17 @@ async function loadRooms() {
   try {
     const data = await api('/api/sections/rooms');
     const tbody = document.getElementById('tbl-rooms');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No rooms found.</p></div></td></tr>'; return; }
+    clearSortCache('tbl-rooms');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No rooms found.</p></div></td></tr>'; return; }
+    _roomCache = {};
+    data.forEach(r => { _roomCache[r.roomId] = r; });
     tbody.innerHTML = data.map(r =>
-      `<tr><td>${r.roomId}</td><td>${r.roomName}</td><td>${r.building || '—'}</td><td>${r.capacity || '—'}</td>
-      <td>${badge(r.isActive ? 'Active' : 'Inactive', r.isActive ? 'success' : 'gray')}</td></tr>`
+      `<tr><td>${escHtml(r.roomId)}</td><td>${escHtml(r.roomName)}</td><td>${escHtml(r.building || '—')}</td><td>${r.capacity || '—'}</td>
+      <td>${badge(r.isActive ? 'Active' : 'Inactive', r.isActive ? 'success' : 'gray')}</td>
+      <td>
+        <button class="btn btn-outline btn-sm registrar-only" onclick="editRoom('${escHtml(r.roomId)}')">Edit</button>
+        <button class="btn btn-danger btn-sm registrar-only" onclick="deleteRoom('${escHtml(r.roomId)}')">Delete</button>
+      </td></tr>`
     ).join('');
   } catch (e) { console.error(e); }
 }
@@ -798,6 +905,7 @@ async function loadUsers() {
   try {
     const data = await api('/api/users');
     const tbody = document.getElementById('tbl-users');
+    clearSortCache('tbl-users');
     tbody.innerHTML = data.map(u =>
       `<tr>
         <td>${escHtml(u.userId)}</td><td>${escHtml(u.username)}</td>
@@ -899,26 +1007,45 @@ async function loadBackup() {
 // ── ADMIN PAGE LOADERS ────────────────────────────────────────
 
 let _auditPage = 0;
+let _auditFilter = null;
+
+function setAuditFilter(type, btn) {
+  _auditFilter = type;
+  document.querySelectorAll('.audit-filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadAuditLog(0);
+}
 
 async function loadAuditLog(page) {
   _auditPage = (page !== undefined) ? page : 0;
   try {
-    const data = await api(`/api/admin/audit-logs?page=${_auditPage}&size=50`);
+    const typeParam = _auditFilter ? `&type=${_auditFilter}` : '';
+    const data = await api(`/api/admin/audit-logs?page=${_auditPage}&size=50${typeParam}`);
     const tbody = document.getElementById('tbl-audit-log');
+    clearSortCache('tbl-audit-log');
     if (!tbody) return;
-    const actionColors = { CREATE: '#2d7d46', UPDATE: '#b45309', DELETE: '#c0392b', LOGIN: '#1d4ed8', LOGIN_FAILED: '#7c3aed' };
+    const actionColors = {
+      CREATE: '#2d7d46', UPDATE: '#b45309', DELETE: '#c0392b',
+      LOGIN_SUCCESS: '#1d4ed8', FAILED_LOGIN: '#7c3aed', ACCOUNT_LOCKED: '#dc2626',
+      LOGOUT: '#374151', PASSWORD_CHANGED: '#0369a1', PASSWORD_RESET_REQUESTED: '#b45309',
+      PASSWORD_RESET_COMPLETED: '#2d7d46', INVALID_RESET_TOKEN: '#dc2626',
+      INACTIVE_LOGIN_ATTEMPT: '#7c3aed'
+    };
+    const typeBadge = t => t === 'SECURITY'
+      ? `<span style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600">Security</span>`
+      : `<span style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600">Audit</span>`;
     tbody.innerHTML = (data.items || []).map(e => {
       const color = actionColors[e.action] || '#374151';
       return `<tr>
         <td style="white-space:nowrap;font-size:.8rem">${fmtDate(e.timestamp)}</td>
         <td>${escHtml(e.performedBy)}</td>
         <td><span class="badge">${escHtml(e.role)}</span></td>
+        <td>${typeBadge(e.logType)}</td>
         <td><span style="font-weight:600;color:${color}">${escHtml(e.action)}</span></td>
-        <td>${escHtml(e.entityType)}</td>
-        <td style="max-width:300px;font-size:.82rem">${escHtml(e.detail || '—')}</td>
+        <td style="max-width:320px;font-size:.82rem">${escHtml(e.detail || '—')}</td>
         <td style="font-size:.8rem;color:var(--gray-400)">${escHtml(e.ipAddress || '—')}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:20px">No audit log entries yet.</td></tr>';
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:20px">No log entries found.</td></tr>';
 
     const pag = document.getElementById('audit-log-pagination');
     if (pag && data.totalPages > 1) {
@@ -935,33 +1062,87 @@ async function loadAuditLog(page) {
 
 // ── STUDENT PAGE LOADERS ───────────────────────────────────────
 
+let _allMyGrades = [];
+
 async function loadMyGrades() {
   try {
-    const me = await api('/api/students/me');
+    const [me, activeSem] = await Promise.all([
+      api('/api/students/me'),
+      SMS.activeSemester ? Promise.resolve(SMS.activeSemester) : api('/api/school-years/semesters/active')
+    ]);
+    if (!SMS.activeSemester && activeSem) SMS.activeSemester = activeSem;
+
     if (me) {
       document.getElementById('my-grades-sub').textContent =
         `${me.studentId} · ${me.firstName} ${me.lastName} · ${me.program?.programName} · Year ${me.currentYearLevel}`;
     }
-    const grades = await api('/api/grades/student/me');
-    document.getElementById('my-grades-sem').textContent = SMS.activeSemester?.semesterLabel || 'Grades';
-    const tbody = document.getElementById('tbl-my-grades');
-    tbody.innerHTML = grades.map(g =>
-      `<tr>
-        <td>${g.course?.courseCode}</td><td>${g.course?.courseName}</td><td>${g.course?.units}</td>
-        <td class="${gradeClass(g.midtermGrade)}">${g.midtermGrade || '—'}</td>
-        <td class="${gradeClass(g.finalGrade)}">${g.finalGrade || '—'}</td>
-        <td class="${gradeClass(g.finalRating)}">${g.finalRating || '—'}</td>
-        <td>${badge(g.gradeStatus)}</td>
-      </tr>`
-    ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">No grades yet</td></tr>';
-    // GWA
-    const gwaEl = document.getElementById('my-gwa');
-    const validGrades = grades.filter(g => g.finalRating != null);
-    if (validGrades.length) {
-      const gwa = (validGrades.reduce((sum,g) => sum + g.finalRating, 0) / validGrades.length).toFixed(2);
-      gwaEl.textContent = gwa;
+
+    _allMyGrades = await api('/api/grades/student/me');
+
+    // Build semester dropdown — always include the active semester even if no grades yet
+    const semsMap = new Map();
+    if (SMS.activeSemester?.semesterId) semsMap.set(SMS.activeSemester.semesterId, SMS.activeSemester);
+    _allMyGrades.forEach(g => {
+      if (g.semester?.semesterId) semsMap.set(g.semester.semesterId, g.semester);
+    });
+    const sems = Array.from(semsMap.values()).sort((a, b) => {
+      const yl = (b.schoolYear?.yearLabel || b.semesterLabel || '').localeCompare(
+                  a.schoolYear?.yearLabel || a.semesterLabel || '');
+      if (yl !== 0) return yl;
+      return (b.semesterNumber || 0) - (a.semesterNumber || 0);
+    });
+
+    const semSelect = document.getElementById('my-grades-sem-filter');
+    semSelect.innerHTML = sems.map(s =>
+      `<option value="${escHtml(s.semesterId)}">${escHtml(s.semesterLabel)}</option>`
+    ).join('');
+
+    // Default to active semester
+    const activeSemId = SMS.activeSemester?.semesterId;
+    if (activeSemId) {
+      semSelect.value = activeSemId;
+    } else if (sems.length) {
+      semSelect.value = sems[0].semesterId;
     }
+
+    renderMyGradesForSem(semSelect.value);
   } catch (e) { console.error(e); }
+}
+
+function filterMyGradesBySem() {
+  const semId = document.getElementById('my-grades-sem-filter').value;
+  renderMyGradesForSem(semId);
+}
+
+function renderMyGradesForSem(semId) {
+  const grades = semId
+    ? _allMyGrades.filter(g => g.semester?.semesterId === semId)
+    : _allMyGrades;
+
+  const semLabel = _allMyGrades.find(g => g.semester?.semesterId === semId)?.semester?.semesterLabel || 'Grades';
+  document.getElementById('my-grades-sem').textContent = semLabel;
+
+  const tbody = document.getElementById('tbl-my-grades');
+  tbody.innerHTML = grades.map(g =>
+    `<tr>
+      <td>${g.course?.courseCode}</td><td>${g.course?.courseName}</td><td>${g.course?.units}</td>
+      <td class="${gradeClass(g.midtermGrade)}">${g.midtermGrade || '—'}</td>
+      <td class="${gradeClass(g.finalGrade)}">${g.finalGrade || '—'}</td>
+      <td class="${gradeClass(g.finalRating)}">${g.finalRating || '—'}</td>
+      <td>${badge(g.gradeStatus)}</td>
+    </tr>`
+  ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">No grades yet</td></tr>';
+
+  // GWA for the selected semester
+  const gwaEl = document.getElementById('my-gwa');
+  const valid = grades.filter(g => g.finalRating != null);
+  if (valid.length) {
+    const totalWeighted = valid.reduce((s, g) => s + g.finalRating * (g.course?.units || 1), 0);
+    const totalUnits    = valid.reduce((s, g) => s + (g.course?.units || 1), 0);
+    gwaEl.textContent = (totalWeighted / totalUnits).toFixed(2);
+  } else {
+    gwaEl.textContent = '—';
+  }
 }
 
 async function loadMySchedule() {
@@ -1903,18 +2084,73 @@ async function saveInstructor() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+function clearRoomForm() {
+  ['rm-id','rm-name','rm-building','rm-capacity'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('rm-modal-title').textContent = 'Add Room';
+}
+
+function editRoom(roomId) {
+  const r = _roomCache[roomId];
+  if (!r) return;
+  document.getElementById('rm-id').value       = r.roomId;
+  document.getElementById('rm-name').value     = r.roomName    || '';
+  document.getElementById('rm-building').value = r.building    || '';
+  document.getElementById('rm-capacity').value = r.capacity    || '';
+  document.getElementById('rm-modal-title').textContent = 'Edit Room';
+  openModal('modal-room');
+}
+
+function deleteInstructor(instructorId) {
+  document.getElementById('del-instructor-id').value = instructorId;
+  openModal('modal-instructor-delete');
+}
+
+async function confirmDeleteInstructor() {
+  const id = document.getElementById('del-instructor-id').value;
+  try {
+    await api(`/api/sections/instructors/${id}`, 'DELETE');
+    toast('Instructor deleted');
+    closeModal('modal-instructor-delete');
+    loadInstructors();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function deleteRoom(roomId) {
+  document.getElementById('del-room-id').value = roomId;
+  openModal('modal-room-delete');
+}
+
+async function confirmDeleteRoom() {
+  const id = document.getElementById('del-room-id').value;
+  try {
+    await api(`/api/sections/rooms/${id}`, 'DELETE');
+    toast('Room deleted');
+    closeModal('modal-room-delete');
+    loadRooms();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 async function saveRoom() {
   if (!validateRequired([
     {id:'rm-name', label:'Room Name'},
   ])) return;
+  const existingId = document.getElementById('rm-id').value;
+  const payload = {
+    roomName:  document.getElementById('rm-name').value,
+    building:  document.getElementById('rm-building').value,
+    capacity:  parseInt(document.getElementById('rm-capacity').value) || null,
+  };
   try {
-    await api('/api/sections/rooms', 'POST', {
-      roomId:    document.getElementById('rm-id').value,
-      roomName:  document.getElementById('rm-name').value,
-      building:  document.getElementById('rm-building').value,
-      capacity:  parseInt(document.getElementById('rm-capacity').value) || null,
-    });
-    toast('Room saved'); closeModal('modal-room'); loadRooms();
+    if (existingId) {
+      await api(`/api/sections/rooms/${existingId}`, 'PUT', payload);
+      toast('Room updated');
+    } else {
+      await api('/api/sections/rooms', 'POST', payload);
+      toast('Room saved');
+    }
+    closeModal('modal-room'); loadRooms();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1928,12 +2164,16 @@ async function saveUser() {
   const pw2 = document.getElementById('usr-password2').value;
   if (pw !== pw2) { toast('Passwords do not match', 'error'); return; }
   try {
+    const email = document.getElementById('usr-email').value.trim();
     await api('/api/users', 'POST', {
       username: document.getElementById('usr-username').value,
       password: pw,
       role:     document.getElementById('usr-role').value,
+      email:    email || null,
     });
-    toast('User account created'); closeModal('modal-user'); loadUsers();
+    toast('User account created');
+    ['usr-username','usr-email','usr-password','usr-password2'].forEach(id => document.getElementById(id).value = '');
+    closeModal('modal-user'); loadUsers();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2511,6 +2751,7 @@ function switchSubTab(btn, status) {
 /** Renders submission rows into the table. */
 function renderSubmissionsTable(rows) {
   const tbody = document.getElementById('tbl-submissions');
+  clearSortCache('tbl-submissions');
   if (!rows || rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:24px">No submissions found.</td></tr>';
     return;
@@ -2603,6 +2844,29 @@ async function openSubmissionDetail(id) {
     sv('sv-school',        s.lastSchoolAttended || '—');
     sv('sv-school-year',   s.lastSchoolYear || '—');
     sv('sv-year-level',    s.lastYearLevel || '—');
+
+    // Documents
+    const docMap = [
+      { elId: 'sv-doc-birth',         path: s.birthCertificate,         label: 'Birth Certificate' },
+      { elId: 'sv-doc-baptismal',      path: s.baptismalCertificate,     label: 'Baptismal Certificate' },
+      { elId: 'sv-doc-confirmation',   path: s.confirmationCertificate,  label: 'Confirmation Certificate' },
+      { elId: 'sv-doc-reportcard',     path: s.reportCard,               label: 'Report Card' },
+      { elId: 'sv-doc-goodmoral',      path: s.goodMoral,                label: 'Good Moral Certificate' },
+    ];
+    docMap.forEach(({ elId, path, label }) => {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (path) {
+        const parts   = path.split('/');
+        const subId   = parts[0];
+        const fname   = parts[1];
+        el.innerHTML  = `<a href="/api/submissions/${subId}/files/${fname}" target="_blank" rel="noopener">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          View ${label}</a>`;
+      } else {
+        el.innerHTML = '<span style="color:var(--gray-400);font-size:0.82rem">Not uploaded</span>';
+      }
+    });
 
     // Show/hide action buttons based on status
     const pendingActions = document.getElementById('sv-pending-actions');

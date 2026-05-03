@@ -18,6 +18,7 @@ package com.seminary.sms.repository;
 
 import com.seminary.sms.entity.Enrollment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer> {
@@ -41,6 +42,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
     // Auto-generates: JOIN tblsemester ON ... WHERE tblsemester.fldSemesterID = ?
     // Called by: EnrollmentController to list all enrolled students for a given semester
     List<Enrollment> findBySemester_SemesterId(String semesterId);
+    List<Enrollment> findBySemester_SemesterId(String semesterId, Sort sort);
 
     // Auto-generates: SELECT COUNT(*) FROM tblenrollment JOIN tblsemester ON ... WHERE fldSemesterID = ?
     // Called by: DashboardController to count how many students are enrolled in the current semester

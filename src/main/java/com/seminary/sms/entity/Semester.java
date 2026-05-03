@@ -57,6 +57,10 @@ public class Semester {
     @Column(name = "fldIsActive", nullable = false, columnDefinition = "TINYINT")
     private Boolean isActive = false;
 
+    @Builder.Default
+    @Column(name = "fldEnrollmentOpen", nullable = false, columnDefinition = "TINYINT DEFAULT 1")
+    private Boolean enrollmentOpen = true;
+
     @Column(name = "fldCreatedAt", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

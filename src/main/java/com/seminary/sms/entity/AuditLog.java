@@ -47,6 +47,13 @@ public class AuditLog {
     @Column(name = "fldIpAddress", length = 50)
     private String ipAddress;
 
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(name = "fldLogType", nullable = false, length = 20)
+    private LogType logType = LogType.AUDIT;
+
     @PrePersist
     protected void onCreate() { timestamp = LocalDateTime.now(); }
+
+    public enum LogType { AUDIT, SECURITY }
 }

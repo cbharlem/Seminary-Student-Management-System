@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+@SuppressWarnings("null")
 @Service
 @RequiredArgsConstructor
 public class AuditService {
@@ -43,6 +44,22 @@ public class AuditService {
             .entityType(entityType)
             .detail(detail)
             .ipAddress(ip)
+            .logType(AuditLog.LogType.AUDIT)
+            .build();
+        auditLogRepository.save(entry);
+    }
+
+    // Used for security events — username may not be authenticated yet (e.g. failed login)
+    public void logSecurity(String username, String action, String detail) {
+        String ip = resolveClientIp();
+        AuditLog entry = AuditLog.builder()
+            .performedBy(username != null ? username : "unknown")
+            .role("System")
+            .action(action)
+            .entityType("Security")
+            .detail(detail)
+            .ipAddress(ip)
+            .logType(AuditLog.LogType.SECURITY)
             .build();
         auditLogRepository.save(entry);
     }

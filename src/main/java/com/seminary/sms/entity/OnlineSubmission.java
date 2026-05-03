@@ -81,6 +81,13 @@ public class OnlineSubmission {
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private Program appliedProgram;
 
+    // ── Submitted Documents (file paths relative to uploads/submissions/) ────
+    @Column(name = "fldBirthCertificate", length = 255)        private String birthCertificate;
+    @Column(name = "fldBaptismalCertificate", length = 255)    private String baptismalCertificate;
+    @Column(name = "fldConfirmationCertificate", length = 255) private String confirmationCertificate;
+    @Column(name = "fldReportCard", length = 255)              private String reportCard;
+    @Column(name = "fldGoodMoral", length = 255)               private String goodMoral;
+
     // ── Submission Tracking ───────────────────────────────────────────────────
     @Enumerated(EnumType.STRING)
     @Column(name = "fldStatus", nullable = false)

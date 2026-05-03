@@ -242,32 +242,38 @@ thead th.sortable:hover {
   color: var(--navy);
 }
 thead th.sortable::after {
-  content: ' ↕';
-  opacity: 1;
-  font-size: 1em;
-  margin-left: 4px;
+  content: '›';
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 1.1em;
+  font-weight: 800;
   color: var(--accent);
-  font-weight: 900;
-  -webkit-text-stroke: 0.4px var(--accent);
+  opacity: 0.7;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease, opacity 0.2s ease, color 0.15s;
+  vertical-align: middle;
+  line-height: 1;
+}
+thead th.sortable:hover::after {
+  opacity: 1;
+  color: var(--navy);
 }
 thead th.sortable.sort-asc,
 thead th.sortable.sort-desc {
-  background: #eef1fb;
+  background: #dce3f8;
   color: var(--navy);
 }
 thead th.sortable.sort-asc::after {
-  content: ' ↑';
+  transform: rotate(-90deg);
   opacity: 1;
-  color: var(--accent);
-  font-size: 0.85em;
-  font-weight: 700;
+  color: var(--navy);
+  font-size: 1.25em;
 }
 thead th.sortable.sort-desc::after {
-  content: ' ↓';
+  transform: rotate(90deg);
   opacity: 1;
-  color: var(--accent);
-  font-size: 0.85em;
-  font-weight: 700;
+  color: var(--navy);
+  font-size: 1.25em;
 }
 
 /* ── Badges ────────────────────────────────────────────────── */
@@ -281,6 +287,17 @@ thead th.sortable.sort-desc::after {
 .badge-danger  { background: var(--danger-bg);  color: var(--danger); }
 .badge-info    { background: var(--info-bg);    color: var(--info); }
 .badge-gray    { background: var(--gray-100);   color: var(--gray-600); }
+
+/* ── Alumni notice ─────────────────────────────────────────── */
+.alumni-notice {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #f0f4ff;
+  border-left: 3px solid #4a6cf7;
+  border-radius: 4px;
+  font-size: .78rem;
+  color: #3b4a6b;
+}
 
 /* ── Buttons ───────────────────────────────────────────────── */
 .btn {
@@ -301,6 +318,9 @@ thead th.sortable.sort-desc::after {
 body.admin-view .registrar-only { display: none !important; }
 .btn-success { background: var(--success); color: white; }
 .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+.audit-filter-tab { background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200); }
+.audit-filter-tab:hover { background: var(--gray-200); }
+.audit-filter-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
 .btn-view {
   background: var(--info-bg); color: var(--info);
   border: 1.5px solid transparent;
@@ -675,3 +695,31 @@ body.admin-view .registrar-only { display: none !important; }
 
 /* Read-only display inputs in modals (e.g. Submission Review) */
 .input-readonly { background: var(--gray-50); color: var(--gray-700,#374151); cursor: default; }
+
+/* Document links in submission review modal */
+.sv-doc-link { font-size: 0.85rem; padding: 2px 0; }
+.sv-doc-link a {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--accent); text-decoration: none; font-weight: 600;
+  padding: 5px 10px; border-radius: 6px;
+  border: 1.5px solid rgba(46,75,189,0.2);
+  background: rgba(46,75,189,0.04); transition: all .15s;
+}
+.sv-doc-link a:hover { background: rgba(46,75,189,0.1); border-color: var(--accent); }
+
+/* ── Enrollment Open/Close — Registrar/Admin page ──────────── */
+.enroll-header-actions          { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.enroll-status-badge            { display: inline-flex; align-items: center; gap: 7px; padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-weight: 600; letter-spacing: .02em; }
+.enroll-status-badge.enroll-status-open   { background: #d1fae5; color: #065f46; border: 1.5px solid #6ee7b7; }
+.enroll-status-badge.enroll-status-closed { background: #fee2e2; color: #991b1b; border: 1.5px solid #fca5a5; }
+.enroll-status-dot              { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.enroll-status-open  .enroll-status-dot  { background: #10b981; }
+.enroll-status-closed .enroll-status-dot { background: #ef4444; }
+
+/* ── Enrollment Status Notice — Student pages ───────────────── */
+.student-enroll-notice          { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-size: .875rem; margin-bottom: 14px; }
+.student-enroll-notice.notice-open   { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.student-enroll-notice.notice-closed { background: #fff7ed; color: #92400e; border: 1px solid #fcd34d; }
+.enroll-notice-dot              { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.enroll-notice-open             { background: #10b981; }
+.enroll-notice-closed           { background: #f59e0b; }

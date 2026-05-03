@@ -31,4 +31,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     // Auto-generates: SELECT COUNT(*) > 0 FROM tblusers WHERE fldUsername = ?
     // Called by: UserController.create() to prevent creating two accounts with the same username
     boolean existsByUsername(String username);
+
+    // Auto-generates: SELECT * FROM tblusers WHERE fldEmail = ?
+    // Called by: PasswordResetController to find a user by email for forgot-password flow
+    Optional<User> findByEmail(String email);
 }
