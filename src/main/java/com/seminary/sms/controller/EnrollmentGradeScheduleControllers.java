@@ -66,6 +66,8 @@ class EnrollmentController {
     private final ApplicationRepository applicationRepository;
     private final StudentService studentService;
     private final EmailService emailService;
+    private final OnlineSubmissionRepository onlineSubmissionRepository;
+    private final DocumentRepository documentRepository;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadEnrollment() to populate the enrollment table
     // LAYER 2 → LAYER 3: Delegates to enrollmentService.getBySemester() if a semester filter is provided
@@ -179,6 +181,35 @@ class EnrollmentController {
 
                 // Create student record + user account
                 String tempPassword = studentService.createWithAccount(student, studentId);
+
+                // Transfer documents from the online submission if the applicant applied online
+                if (applicant.getEmail() != null) {
+                    java.util.Optional<com.seminary.sms.entity.OnlineSubmission> subOpt =
+                        onlineSubmissionRepository.findFirstByEmailAndStatus(
+                            applicant.getEmail(), com.seminary.sms.entity.OnlineSubmission.SubmissionStatus.Accepted);
+                    if (subOpt.isPresent()) {
+                        com.seminary.sms.entity.OnlineSubmission sub = subOpt.get();
+                        long seq = documentRepository.count();
+                        record DocEntry(String path, Document.DocumentType type) {}
+                        java.util.List<DocEntry> entries = new java.util.ArrayList<>();
+                        if (sub.getBirthCertificate()        != null) entries.add(new DocEntry(sub.getBirthCertificate(),        Document.DocumentType.BirthCertificate));
+                        if (sub.getBaptismalCertificate()    != null) entries.add(new DocEntry(sub.getBaptismalCertificate(),    Document.DocumentType.BaptismalRecord));
+                        if (sub.getConfirmationCertificate() != null) entries.add(new DocEntry(sub.getConfirmationCertificate(), Document.DocumentType.ConfirmationRecord));
+                        if (sub.getReportCard()              != null) entries.add(new DocEntry(sub.getReportCard(),              Document.DocumentType.Form137));
+                        if (sub.getGoodMoral()               != null) entries.add(new DocEntry(sub.getGoodMoral(),               Document.DocumentType.GoodMoral));
+                        for (int i = 0; i < entries.size(); i++) {
+                            String p = entries.get(i).path();
+                            String fname = p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p;
+                            documentRepository.save(Document.builder()
+                                .documentId("DOC-" + String.format("%04d", 1001 + seq + i))
+                                .student(student)
+                                .documentType(entries.get(i).type())
+                                .fileName(fname)
+                                .filePath("submissions/" + p)
+                                .build());
+                        }
+                    }
+                }
 
                 // Mark application as Enrolled
                 application.setApplicationStatus(Application.ApplicationStatus.Enrolled);

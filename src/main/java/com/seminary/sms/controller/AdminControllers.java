@@ -52,6 +52,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.transaction.Transactional;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.StringUtils;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -766,24 +776,108 @@ class PublicController {
 class DocumentController {
 
     private final DocumentRepository documentRepository;
+    private final StudentRepository studentRepository;
+    private final OnlineSubmissionRepository onlineSubmissionRepository;
 
-    // LAYER 1 → LAYER 2: Triggered when the registrar views a student's document list
-    // LAYER 2 → LAYER 4: Calls documentRepository.findByStudent_StudentId() — no service needed
-    // LAYER 2 → LAYER 1: Returns a JSON list of Document records for the student
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasAnyRole('Registrar','Admin') or @studentSecurity.isOwner(authentication, #studentId)")
     public List<Document> getByStudent(@PathVariable String studentId) {
         return documentRepository.findByStudent_StudentId(studentId);
     }
 
-    // LAYER 1 → LAYER 2: Triggered when the registrar deletes a document record
-    // LAYER 2 → LAYER 4: Calls documentRepository.deleteById() using the integer PK
-    // LAYER 2 → LAYER 1: Returns a simple success message JSON
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> delete(@PathVariable Integer id) {
         documentRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "Document deleted"));
+    }
+
+    @GetMapping("/{id}/file")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
+    public ResponseEntity<Resource> serveFile(@PathVariable Integer id) throws IOException {
+        Document doc = documentRepository.findById(id).orElse(null);
+        if (doc == null) return ResponseEntity.notFound().build();
+        Path filePath = Paths.get("uploads", doc.getFilePath()).normalize().toAbsolutePath();
+        Resource resource = new UrlResource(filePath.toUri());
+        if (!resource.exists()) return ResponseEntity.notFound().build();
+        String contentType = Files.probeContentType(filePath);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + doc.getFileName() + "\"")
+            .body(resource);
+    }
+
+    @PostMapping(value = "/student/{studentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> upload(
+            @PathVariable String studentId,
+            @RequestParam String documentType,
+            @RequestParam MultipartFile file,
+            @RequestParam(required = false) String remarks) throws IOException {
+        Student student = studentRepository.findByStudentId(studentId).orElse(null);
+        if (student == null) return ResponseEntity.badRequest().body(Map.of("error", "Student not found"));
+        String ext = StringUtils.getFilenameExtension(file.getOriginalFilename());
+        String[] allowed = {"pdf", "jpg", "jpeg", "png"};
+        boolean validExt = false;
+        if (ext != null) for (String a : allowed) if (a.equalsIgnoreCase(ext)) { validExt = true; break; }
+        if (!validExt) return ResponseEntity.badRequest().body(Map.of("error", "File must be PDF, JPG, or PNG"));
+        String fileName = studentId + "-" + documentType.toLowerCase() + "-" + System.currentTimeMillis() + "." + ext.toLowerCase();
+        Path dir = Paths.get("uploads", "documents", studentId);
+        Files.createDirectories(dir);
+        file.transferTo(dir.resolve(fileName).toAbsolutePath());
+        Document doc = Document.builder()
+            .documentId("DOC-" + String.format("%04d", 1001 + documentRepository.count()))
+            .student(student)
+            .documentType(Document.DocumentType.valueOf(documentType))
+            .fileName(fileName)
+            .filePath("documents/" + studentId + "/" + fileName)
+            .remarks(remarks != null && !remarks.isBlank() ? remarks.trim() : null)
+            .build();
+        return ResponseEntity.ok(documentRepository.save(doc));
+    }
+
+    @PostMapping("/backfill")
+    @PreAuthorize("hasRole('Admin')")
+    @Transactional
+    public ResponseEntity<?> backfill() {
+        record DocEntry(String path, Document.DocumentType type) {}
+        List<Student> students = studentRepository.findAll();
+        // Read count once before the loop so increments stay unique within the transaction
+        long seq = documentRepository.count();
+        int transferred = 0;
+        int skipped = 0;
+        for (Student student : students) {
+            if (student.getEmail() == null || student.getEmail().isBlank()) { skipped++; continue; }
+            java.util.Optional<com.seminary.sms.entity.OnlineSubmission> subOpt =
+                onlineSubmissionRepository.findFirstByEmailAndStatus(
+                    student.getEmail(), com.seminary.sms.entity.OnlineSubmission.SubmissionStatus.Accepted);
+            if (subOpt.isEmpty()) { skipped++; continue; }
+            com.seminary.sms.entity.OnlineSubmission sub = subOpt.get();
+            java.util.List<DocEntry> entries = new java.util.ArrayList<>();
+            if (sub.getBirthCertificate()        != null) entries.add(new DocEntry(sub.getBirthCertificate(),        Document.DocumentType.BirthCertificate));
+            if (sub.getBaptismalCertificate()    != null) entries.add(new DocEntry(sub.getBaptismalCertificate(),    Document.DocumentType.BaptismalRecord));
+            if (sub.getConfirmationCertificate() != null) entries.add(new DocEntry(sub.getConfirmationCertificate(), Document.DocumentType.ConfirmationRecord));
+            if (sub.getReportCard()              != null) entries.add(new DocEntry(sub.getReportCard(),              Document.DocumentType.Form137));
+            if (sub.getGoodMoral()               != null) entries.add(new DocEntry(sub.getGoodMoral(),               Document.DocumentType.GoodMoral));
+            for (DocEntry entry : entries) {
+                String filePath = "submissions/" + entry.path();
+                if (documentRepository.existsByFilePath(filePath)) continue;
+                String fname = entry.path().contains("/") ? entry.path().substring(entry.path().lastIndexOf('/') + 1) : entry.path();
+                documentRepository.save(Document.builder()
+                    .documentId("DOC-" + String.format("%04d", 1001 + ++seq))
+                    .student(student)
+                    .documentType(entry.type())
+                    .fileName(fname)
+                    .filePath(filePath)
+                    .build());
+                transferred++;
+            }
+        }
+        return ResponseEntity.ok(Map.of(
+            "message", "Backfill complete",
+            "documentsTransferred", transferred,
+            "studentsSkipped", skipped
+        ));
     }
 }
 

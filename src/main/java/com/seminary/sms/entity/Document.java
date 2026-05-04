@@ -57,6 +57,6 @@ public class Document {
     public enum DocumentType {
         BirthCertificate, Form137, Diploma, BaptismalRecord, ConfirmationRecord,
         MarriageContractOfParents, MedicalRecord, DentalRecord,
-        ParishPriestRecommendation, Other
+        ParishPriestRecommendation, GoodMoral, Other
     }
 }

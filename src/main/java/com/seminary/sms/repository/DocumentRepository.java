@@ -24,4 +24,6 @@ public interface DocumentRepository extends JpaRepository<Document, Integer> {
     // Auto-generates: JOIN tblstudents ON ... WHERE tblstudents.fldStudentID = ?
     // Called by: DocumentController.getByStudent() to list a student's uploaded documents
     List<Document> findByStudent_StudentId(String studentId);
+
+    boolean existsByFilePath(String filePath);
 }

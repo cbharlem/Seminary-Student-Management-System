@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.util.List;
@@ -91,16 +92,28 @@ class StudentController {
     // LAYER 1 → LAYER 2: Triggered by app.js saveStudent() when editing an existing student record
     // LAYER 2 → LAYER 3: Delegates saving to studentService.save() after verifying the student exists
     // LAYER 2 → LAYER 1: Returns the updated Student JSON, or 404 if the ID is not found
+    @Transactional
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> update(@PathVariable String id, @RequestBody Student student) {
-        Student existing = studentRepository.findByStudentId(id).orElse(null);
+        Student existing = studentRepository.findByStudentIdWithUser(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         if (existing.getCurrentStatus() == Student.StudentStatus.Alumni)
             return ResponseEntity.badRequest().body(Map.of("error", "Cannot modify the record of a graduated student."));
+        boolean emailChanged = student.getEmail() != null
+                && !student.getEmail().equalsIgnoreCase(existing.getEmail());
+        student.setIndex(existing.getIndex());
         student.setStudentId(id);
+        student.setApplication(existing.getApplication());
+        student.setUser(existing.getUser());
+        student.setCreatedAt(existing.getCreatedAt());
         resolveStudentRefs(student);
-        return ResponseEntity.ok(studentService.save(student));
+        Student saved = studentService.save(student);
+        // User is a managed entity within this transaction — mutating it is enough; no save() call needed.
+        if (emailChanged && existing.getUser() != null) {
+            existing.getUser().setEmail(student.getEmail());
+        }
+        return ResponseEntity.ok(saved);
     }
 
     // Converts the plain IDs sent from the browser (programId, applicationId, userId)

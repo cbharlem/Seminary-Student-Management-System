@@ -2,6 +2,7 @@ package com.seminary.sms.repository;
 import com.seminary.sms.entity.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import java.util.List;
@@ -73,6 +74,10 @@ public interface StudentRepository extends JpaRepository<Student, Integer> {
     // Auto-generates: JOIN tblprogram ... WHERE tblprogram.fldIndex = ? AND fldCurrentStatus = ?
     // Called by: lookups that filter students by program PK and status together
     List<Student> findByProgram_IndexAndCurrentStatus(Integer programIndex, Student.StudentStatus status);
+
+    // Eagerly loads the linked User in the same query to avoid LazyInitializationException
+    @Query("SELECT s FROM Student s LEFT JOIN FETCH s.user WHERE s.studentId = :studentId")
+    Optional<Student> findByStudentIdWithUser(@Param("studentId") String studentId);
 
     // Too complex for auto-generation — manually written JPQL query
     // Searches firstName, lastName, and studentId all at once (case-insensitive)

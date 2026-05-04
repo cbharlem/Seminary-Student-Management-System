@@ -30,6 +30,9 @@ public interface OnlineSubmissionRepository extends JpaRepository<OnlineSubmissi
     /** Prevent duplicate pending submissions from the same email address. */
     boolean existsByEmailAndStatus(String email, OnlineSubmission.SubmissionStatus status);
 
+    /** Find the accepted submission for a given email — used to transfer documents on enrollment. */
+    java.util.Optional<OnlineSubmission> findFirstByEmailAndStatus(String email, OnlineSubmission.SubmissionStatus status);
+
     /**
      * Returns the highest numeric suffix used in any submissionId so far.
      * Used to generate the next SUB-#### value.

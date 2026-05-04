@@ -445,8 +445,187 @@ async function viewStudent(id) {
     }
     notice.style.display = isAlumni ? '' : 'none';
 
+    await loadStudentDocuments(id);
+
     gotoPage('student-detail', null);
   } catch (e) { toast('Failed to load student record', 'error'); }
+}
+
+async function loadStudentDocuments(studentId) {
+  const container = document.getElementById('sd-docs');
+  if (!container) return;
+  const fileIcon  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;margin-top:1px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm-2 8H7v-2h4v2zm4-4H7v-2h8v2z"/></svg>`;
+  const printIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>`;
+  try {
+    const docs = await api(`/api/documents/student/${studentId}`);
+    if (!docs.length) {
+      container.innerHTML = `<p style="font-size:.75rem;color:var(--gray-400);font-style:italic;margin:0">No documents on file.</p>`;
+        return;
+    }
+    container.innerHTML = docs.map(d => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:var(--gray-50);border:1px solid var(--gray-100)">
+        <span style="color:var(--gray-400)">${fileIcon}</span>
+        <a href="/api/documents/${d.index}/file" target="_blank"
+           style="flex:1;font-size:.76rem;font-weight:500;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           title="${escHtml(d.fileName)}"
+           onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+          ${escHtml(fmtDocType(d.documentType))}
+        </a>
+        <button onclick="printDocument(${d.index})" title="Print document"
+          style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--accent);display:flex;align-items:center;border-radius:4px;transition:opacity .15s;opacity:.75"
+          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.75'">${printIcon}</button>
+        <button class="registrar-only" onclick="deleteDocument(${d.index},'${escHtml(studentId)}','${escHtml(fmtDocType(d.documentType))}')" title="Remove document"
+          style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:.8rem;font-weight:700;color:var(--danger);line-height:1;border-radius:4px;opacity:.6;transition:opacity .15s"
+          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">✕</button>
+      </div>`).join('');
+  } catch (_) {
+    container.innerHTML = `<p style="font-size:.75rem;color:var(--gray-400);font-style:italic;margin:0">Could not load documents.</p>`;
+  }
+}
+
+function printDocument(docId) {
+  const win = window.open(`/api/documents/${docId}/file`, '_blank');
+  if (win) win.addEventListener('load', () => { try { win.print(); } catch(_) {} });
+}
+
+function printAllDocuments() {
+  const container = document.getElementById('sd-docs');
+  const ids = (container?.dataset?.docIds || '').split(',').filter(Boolean);
+  if (!ids.length) return;
+  ids.forEach(id => window.open(`/api/documents/${id}/file`, '_blank'));
+  toast(`${ids.length} document${ids.length > 1 ? 's' : ''} opened — press Ctrl+P in each tab to print`);
+}
+
+function fmtDocType(type) {
+  const map = {
+    BirthCertificate:'Birth Certificate', Form137:'Form 137', Diploma:'Diploma',
+    BaptismalRecord:'Baptismal Record', ConfirmationRecord:'Confirmation Record',
+    MarriageContractOfParents:'Marriage Contract of Parents', MedicalRecord:'Medical Record',
+    DentalRecord:'Dental Record', ParishPriestRecommendation:'Parish Priest Recommendation',
+    GoodMoral:'Good Moral Certificate', Other:'Other Document'
+  };
+  return map[type] || type;
+}
+
+let _deleteDocId = null;
+let _deleteDocStudentId = null;
+
+function deleteDocument(docId, studentId, docLabel) {
+  _deleteDocId = docId;
+  _deleteDocStudentId = studentId;
+  document.getElementById('delete-doc-sub').textContent =
+    `Are you sure you want to remove "${docLabel}" from this student's record? This cannot be undone.`;
+  openModal('modal-delete-doc');
+}
+
+async function confirmDeleteDocument() {
+  try {
+    await api(`/api/documents/${_deleteDocId}`, 'DELETE');
+    closeModal('modal-delete-doc');
+    await loadStudentDocuments(_deleteDocStudentId);
+    toast('Document removed');
+  } catch (e) {
+    closeModal('modal-delete-doc');
+    toast('Failed to remove document', 'error');
+  }
+}
+
+function onDocFileChange(input) {
+  const file = input.files[0];
+  const label = document.getElementById('doc-file-label');
+  const zone  = document.getElementById('doc-file-zone');
+  if (file) {
+    label.textContent = file.name;
+    label.style.color = 'var(--gray-800)';
+    zone.style.borderColor = 'var(--accent)';
+    zone.style.borderStyle = 'solid';
+  } else {
+    label.textContent = 'Click to choose a file or drag and drop here';
+    label.style.color = 'var(--gray-600)';
+    zone.style.borderColor = 'var(--gray-200)';
+    zone.style.borderStyle = 'dashed';
+  }
+}
+
+function handleDocFileDrop(event) {
+  event.preventDefault();
+  const zone = document.getElementById('doc-file-zone');
+  zone.style.borderColor = 'var(--gray-200)';
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  const input = document.getElementById('doc-file');
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  onDocFileChange(input);
+}
+
+function closeUploadDocModal() {
+  closeModal('modal-upload-doc');
+  document.getElementById('doc-file').value = '';
+  document.getElementById('doc-remarks').value = '';
+  document.getElementById('doc-type').value = '';
+  document.getElementById('doc-file-label').textContent = 'Click to choose a file or drag and drop here';
+  document.getElementById('doc-file-label').style.color = 'var(--gray-600)';
+  const zone = document.getElementById('doc-file-zone');
+  zone.style.borderColor = 'var(--gray-200)';
+  zone.style.borderStyle = 'dashed';
+  document.getElementById('upload-doc-error').style.display = 'none';
+}
+
+function showUploadDocError(msg) {
+  const el = document.getElementById('upload-doc-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function uploadStudentDocument() {
+  document.getElementById('upload-doc-error').style.display = 'none';
+  const type    = document.getElementById('doc-type').value;
+  const file    = document.getElementById('doc-file').files[0];
+  const remarks = document.getElementById('doc-remarks').value;
+
+  if (!type)  { showUploadDocError('Please select a document type.'); return; }
+  if (!file)  { showUploadDocError('Please select a file to upload.'); return; }
+
+  const allowed = ['pdf', 'jpg', 'jpeg', 'png'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) { showUploadDocError('File must be a PDF, JPG, or PNG.'); return; }
+  if (file.size > 5 * 1024 * 1024) { showUploadDocError('File size must not exceed 5 MB.'); return; }
+
+  // Warn if a document of the same type already exists
+  try {
+    const existing = await api(`/api/documents/student/${_currentStudentId}`);
+    const duplicate = existing.find(d => d.documentType === type);
+    if (duplicate) {
+      const confirmed = confirm(`A ${fmtDocType(type)} is already on file for this student. Uploading a new one will add it alongside the existing document — it will not replace it. Continue?`);
+      if (!confirmed) return;
+    }
+  } catch (_) {}
+
+  const btn = document.querySelector('#modal-upload-doc .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+
+  const formData = new FormData();
+  formData.append('documentType', type);
+  formData.append('file', file);
+  if (remarks.trim()) formData.append('remarks', remarks.trim());
+  try {
+    const res = await fetch(`/api/documents/student/${_currentStudentId}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed. Please try again.');
+    }
+    closeUploadDocModal();
+    await loadStudentDocuments(_currentStudentId);
+    toast('Document uploaded successfully');
+  } catch (e) { showUploadDocError(e.message); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Upload'; } }
 }
 
 function readonlyField(label, value) {
@@ -1014,6 +1193,14 @@ function setAuditFilter(type, btn) {
   document.querySelectorAll('.audit-filter-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   loadAuditLog(0);
+}
+
+async function runDocumentBackfill() {
+  if (!confirm('This will copy online submission documents to student records for all existing students. Safe to run multiple times. Continue?')) return;
+  try {
+    const result = await api('/api/documents/backfill', 'POST');
+    toast(`Backfill complete — ${result.documentsTransferred} documents transferred, ${result.studentsSkipped} students skipped`);
+  } catch (e) { toast('Backfill failed: ' + e.message, 'error'); }
 }
 
 async function loadAuditLog(page) {

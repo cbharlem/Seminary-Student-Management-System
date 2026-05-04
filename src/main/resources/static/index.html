@@ -587,7 +587,10 @@
       <h2>System Logs</h2>
       <p>Full history of all actions and security events in the system — Admin only</p>
     </div>
-    <button class="btn btn-outline" onclick="loadAuditLog()">↻ Refresh</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="loadAuditLog()">↻ Refresh</button>
+      <button class="btn btn-outline" onclick="runDocumentBackfill()" title="Copy online submission documents to student records for all existing students">Backfill Documents</button>
+    </div>
   </div>
   <div class="card">
     <div class="card-header" style="flex-direction:column;align-items:flex-start;gap:12px">
@@ -1399,13 +1402,29 @@
   </div>
 </div>
 
+<!-- Delete Document Confirmation -->
+<div class="modal-overlay" id="modal-delete-doc">
+  <div class="modal" style="max-width:400px">
+    <h3>Remove Document</h3>
+    <p class="modal-sub" id="delete-doc-sub">Are you sure you want to remove this document from the student record? This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-delete-doc')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteDocument()">Remove</button>
+    </div>
+  </div>
+</div>
+
 <!-- Upload Document -->
 <div class="modal-overlay" id="modal-upload-doc">
   <div class="modal">
-    <h3>Upload Document</h3><p class="modal-sub">Attach a scanned document to the student record</p>
+    <h3>Upload Document</h3>
+    <p class="modal-sub">Attach a scanned document to this student's record</p>
+    <div id="upload-doc-error" style="display:none;background:var(--danger-bg);color:var(--danger);font-size:.8rem;padding:10px 12px;border-radius:6px;margin-bottom:12px"></div>
     <div class="modal-grid">
-      <div class="field"><label for="doc-type">Document Type <span style="color:var(--danger)">*</span></label>
+      <div class="field full">
+        <label for="doc-type">Document Type <span style="color:var(--danger)">*</span></label>
         <select id="doc-type" required>
+          <option value="">Select document type…</option>
           <option value="BirthCertificate">Birth Certificate</option>
           <option value="Form137">Form 137</option>
           <option value="Diploma">Diploma</option>
@@ -1415,15 +1434,24 @@
           <option value="MedicalRecord">Medical Record</option>
           <option value="DentalRecord">Dental Record</option>
           <option value="ParishPriestRecommendation">Parish Priest Recommendation</option>
+          <option value="GoodMoral">Good Moral Certificate</option>
           <option value="Other">Other</option>
         </select>
       </div>
-      <div class="field"><label for="doc-file">File <span style="color:var(--gray-400);font-weight:400;font-size:0.75rem">(PDF, JPG, PNG)</span></label><input id="doc-file" type="file" accept=".pdf,.jpg,.jpeg,.png"/></div>
+      <div class="field full">
+        <label>File <span style="color:var(--danger)">*</span> <span style="color:var(--gray-400);font-weight:400;font-size:.75rem">— PDF, JPG, or PNG · Max 5 MB</span></label>
+        <div id="doc-file-zone" onclick="document.getElementById('doc-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--gray-200)'" ondrop="handleDocFileDrop(event)"
+          style="border:1.5px dashed var(--gray-200);border-radius:7px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s;background:var(--gray-50)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="color:var(--gray-400);display:block;margin:0 auto 8px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+          <p id="doc-file-label" style="font-size:.8rem;color:var(--gray-600);margin:0">Click to choose a file or drag and drop here</p>
+        </div>
+        <input id="doc-file" type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="onDocFileChange(this)"/>
+      </div>
       <div class="field full"><label for="doc-remarks">Remarks</label><input id="doc-remarks" placeholder="Optional notes about this document"/></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('modal-upload-doc')">Cancel</button>
-      <button class="btn btn-primary registrar-only">Upload</button>
+      <button class="btn btn-outline" onclick="closeUploadDocModal()">Cancel</button>
+      <button class="btn btn-primary registrar-only" onclick="uploadStudentDocument()">Upload</button>
     </div>
   </div>
 </div>
