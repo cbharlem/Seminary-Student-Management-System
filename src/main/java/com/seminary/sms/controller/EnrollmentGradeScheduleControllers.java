@@ -680,8 +680,12 @@ class ScheduleController {
             // SECURITY (A07): Null checks before LocalTime.parse
             if (body.get("timeStart") == null || body.get("timeEnd") == null)
                 throw new RuntimeException("Start time and end time are required.");
-            schedule.setTimeStart(java.time.LocalTime.parse(body.get("timeStart")));
-            schedule.setTimeEnd(java.time.LocalTime.parse(body.get("timeEnd")));
+            java.time.LocalTime timeStart = java.time.LocalTime.parse(body.get("timeStart"));
+            java.time.LocalTime timeEnd   = java.time.LocalTime.parse(body.get("timeEnd"));
+            String timeError = validateScheduleTime(timeStart, timeEnd);
+            if (timeError != null) return ResponseEntity.badRequest().body(Map.of("error", timeError));
+            schedule.setTimeStart(timeStart);
+            schedule.setTimeEnd(timeEnd);
             return ResponseEntity.ok(scheduleService.save(schedule));
         } catch (IllegalArgumentException e) {
             // SECURITY (A08): Enum poisoning — return generic message not class path
@@ -716,8 +720,12 @@ class ScheduleController {
             schedule.setDayOfWeek(Schedule.DayOfWeek.valueOf(body.get("dayOfWeek")));
             if (body.get("timeStart") == null || body.get("timeEnd") == null)
                 throw new RuntimeException("Start time and end time are required.");
-            schedule.setTimeStart(java.time.LocalTime.parse(body.get("timeStart")));
-            schedule.setTimeEnd(java.time.LocalTime.parse(body.get("timeEnd")));
+            java.time.LocalTime timeStart = java.time.LocalTime.parse(body.get("timeStart"));
+            java.time.LocalTime timeEnd   = java.time.LocalTime.parse(body.get("timeEnd"));
+            String timeError = validateScheduleTime(timeStart, timeEnd);
+            if (timeError != null) return ResponseEntity.badRequest().body(Map.of("error", timeError));
+            schedule.setTimeStart(timeStart);
+            schedule.setTimeEnd(timeEnd);
             return ResponseEntity.ok(scheduleService.update(schedule, id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid day of week value."));
@@ -728,6 +736,16 @@ class ScheduleController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "An unexpected error occurred."));
         }
+    }
+
+    private String validateScheduleTime(java.time.LocalTime start, java.time.LocalTime end) {
+        if (!end.isAfter(start))               return "End time must be after start time.";
+        long minutes = java.time.Duration.between(start, end).toMinutes();
+        if (minutes < 30)                      return "Class duration must be at least 30 minutes.";
+        if (minutes > 360)                     return "Class duration cannot exceed 6 hours.";
+        if (start.isBefore(java.time.LocalTime.of(6, 0)))  return "Classes cannot be scheduled before 6:00 AM.";
+        if (end.isAfter(java.time.LocalTime.of(22, 0)))    return "Classes cannot be scheduled past 10:00 PM.";
+        return null;
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js doDeleteSchedule() when the registrar confirms schedule deletion

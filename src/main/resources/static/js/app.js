@@ -2450,6 +2450,8 @@ async function saveSchoolYear() {
   const startDate  = document.getElementById('sem-start').value;
   const endDate    = document.getElementById('sem-end').value;
 
+  if (startDate >= endDate) { toast('End date must be after start date', 'error'); return; }
+
   // Auto-generate semester label from year + semester number
   const semNumNames = { '1': 'First', '2': 'Second', '3': 'Summer' };
   const semLabel = semNum === '3'

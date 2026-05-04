@@ -333,7 +333,14 @@ class SectionController {
     // LAYER 2 → LAYER 1: Returns the saved Section JSON
     @PostMapping
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Section> create(@RequestBody Section section) {
+    public ResponseEntity<?> create(@RequestBody Section section) {
+        String semId = section.getSemester() != null ? section.getSemester().getSemesterId() : null;
+        if (semId != null) {
+            if (sectionRepository.existsBySectionCodeAndSemester_SemesterId(section.getSectionCode(), semId))
+                return ResponseEntity.badRequest().body(Map.of("error", "A section with that code already exists in this semester"));
+            if (sectionRepository.existsBySectionNameAndSemester_SemesterId(section.getSectionName(), semId))
+                return ResponseEntity.badRequest().body(Map.of("error", "A section with that name already exists in this semester"));
+        }
         section.setSectionId("SEC-" + String.format("%04d", 1001 + sectionRepository.count()));
         if (section.getProgram() != null && section.getProgram().getProgramId() != null)
             programRepository.findByProgramId(section.getProgram().getProgramId()).ifPresent(section::setProgram);
@@ -347,9 +354,17 @@ class SectionController {
     // LAYER 2 → LAYER 1: Returns the updated Section JSON, or 404 if not found
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Section> update(@PathVariable String id, @RequestBody Section section) {
+    public ResponseEntity<?> update(@PathVariable String id, @RequestBody Section section) {
         Section existing = sectionRepository.findBySectionId(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
+        String semId = section.getSemester() != null ? section.getSemester().getSemesterId()
+                     : existing.getSemester() != null ? existing.getSemester().getSemesterId() : null;
+        if (semId != null) {
+            if (sectionRepository.existsBySectionCodeAndSemester_SemesterIdAndSectionIdNot(section.getSectionCode(), semId, id))
+                return ResponseEntity.badRequest().body(Map.of("error", "A section with that code already exists in this semester"));
+            if (sectionRepository.existsBySectionNameAndSemester_SemesterIdAndSectionIdNot(section.getSectionName(), semId, id))
+                return ResponseEntity.badRequest().body(Map.of("error", "A section with that name already exists in this semester"));
+        }
         existing.setSectionCode(section.getSectionCode());
         existing.setSectionName(section.getSectionName());
         existing.setYearLevel(section.getYearLevel());
@@ -716,7 +731,7 @@ class SchoolYearController {
     // LAYER 2 → LAYER 1: Returns the saved Semester JSON
     @PostMapping("/semesters")
     @PreAuthorize("hasRole('Admin')")
-    public ResponseEntity<Semester> createSemester(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> createSemester(@RequestBody Map<String, Object> body) {
         String schoolYearId = (String) body.get("schoolYearId");
         SchoolYear sy = schoolYearRepository.findBySchoolYearId(schoolYearId)
             .orElseThrow(() -> new RuntimeException("School year not found: " + schoolYearId));
@@ -725,8 +740,16 @@ class SchoolYearController {
         semester.setSchoolYear(sy);
         semester.setSemesterNumber(Integer.parseInt(body.get("semesterNumber").toString()));
         semester.setSemesterLabel((String) body.get("semesterLabel"));
-        semester.setStartDate(LocalDate.parse((String) body.get("startDate")));
-        semester.setEndDate(LocalDate.parse((String) body.get("endDate")));
+        LocalDate startDate = LocalDate.parse((String) body.get("startDate"));
+        LocalDate endDate   = LocalDate.parse((String) body.get("endDate"));
+        if (!endDate.isAfter(startDate))
+            return ResponseEntity.badRequest().body(Map.of("error", "End date must be after start date"));
+        boolean duplicate = semesterRepository.existsBySchoolYear_SchoolYearIdAndSemesterNumber(
+            schoolYearId, Integer.parseInt(body.get("semesterNumber").toString()));
+        if (duplicate)
+            return ResponseEntity.badRequest().body(Map.of("error", "A semester with that number already exists for this school year"));
+        semester.setStartDate(startDate);
+        semester.setEndDate(endDate);
         semester.setIsActive(false);
         semester.setEnrollmentOpen(true);
         return ResponseEntity.ok(semesterRepository.save(semester));
@@ -739,8 +762,12 @@ class SchoolYearController {
             .orElseThrow(() -> new RuntimeException("Semester not found: " + id));
         if (body.containsKey("semesterLabel"))  sem.setSemesterLabel((String) body.get("semesterLabel"));
         if (body.containsKey("semesterNumber")) sem.setSemesterNumber(Integer.parseInt(body.get("semesterNumber").toString()));
-        if (body.containsKey("startDate"))      sem.setStartDate(LocalDate.parse((String) body.get("startDate")));
-        if (body.containsKey("endDate"))        sem.setEndDate(LocalDate.parse((String) body.get("endDate")));
+        LocalDate updStart = body.containsKey("startDate") ? LocalDate.parse((String) body.get("startDate")) : sem.getStartDate();
+        LocalDate updEnd   = body.containsKey("endDate")   ? LocalDate.parse((String) body.get("endDate"))   : sem.getEndDate();
+        if (!updEnd.isAfter(updStart))
+            return ResponseEntity.badRequest().body(Map.of("error", "End date must be after start date"));
+        sem.setStartDate(updStart);
+        sem.setEndDate(updEnd);
         return ResponseEntity.ok(semesterRepository.save(sem));
     }
 }

@@ -87,4 +87,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     // Auto-generates: SELECT COUNT(*) > 0 ... JOIN tblcourses WHERE fldCourseID = ?
     // Called by: CurriculumController.updateCourse() to block structural edits to scheduled courses
     boolean existsByCourse_CourseId(String courseId);
+
+    // Section conflict checks — prevents the same section from having overlapping classes on the same day
+    @Query("SELECT s FROM Schedule s WHERE s.section.sectionId = :sectionId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsBySection(@Param("sectionId") String sectionId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+
+    @Query("SELECT s FROM Schedule s WHERE s.section.sectionId = :sectionId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsBySectionExcluding(@Param("sectionId") String sectionId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
 }

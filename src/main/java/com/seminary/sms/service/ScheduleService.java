@@ -54,25 +54,39 @@ public class ScheduleService {
     public List<String> detectConflicts(Schedule candidate, String excludeScheduleId) {
         List<String> conflicts = new ArrayList<>();
 
-        List<Schedule> roomConflicts = (excludeScheduleId != null)
-            ? scheduleRepository.findConflictsByRoomExcluding(
-                candidate.getRoom().getRoomId(), excludeScheduleId,
-                candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd())
-            : scheduleRepository.findConflictsByRoom(
-                candidate.getRoom().getRoomId(),
-                candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd());
-        if (!roomConflicts.isEmpty())
-            conflicts.add("Room '" + candidate.getRoom().getRoomName() + "' is already booked at this time.");
+        if (candidate.getRoom() != null) {
+            List<Schedule> roomConflicts = (excludeScheduleId != null)
+                ? scheduleRepository.findConflictsByRoomExcluding(
+                    candidate.getRoom().getRoomId(), excludeScheduleId,
+                    candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd())
+                : scheduleRepository.findConflictsByRoom(
+                    candidate.getRoom().getRoomId(),
+                    candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd());
+            if (!roomConflicts.isEmpty())
+                conflicts.add("Room '" + candidate.getRoom().getRoomName() + "' is already booked at this time.");
+        }
 
-        List<Schedule> instrConflicts = (excludeScheduleId != null)
-            ? scheduleRepository.findConflictsByInstructorExcluding(
-                candidate.getInstructor().getInstructorId(), excludeScheduleId,
+        if (candidate.getInstructor() != null) {
+            List<Schedule> instrConflicts = (excludeScheduleId != null)
+                ? scheduleRepository.findConflictsByInstructorExcluding(
+                    candidate.getInstructor().getInstructorId(), excludeScheduleId,
+                    candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd())
+                : scheduleRepository.findConflictsByInstructor(
+                    candidate.getInstructor().getInstructorId(),
+                    candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd());
+            if (!instrConflicts.isEmpty())
+                conflicts.add("Instructor '" + candidate.getInstructor().getFullName() + "' has another class at this time.");
+        }
+
+        List<Schedule> sectionConflicts = (excludeScheduleId != null)
+            ? scheduleRepository.findConflictsBySectionExcluding(
+                candidate.getSection().getSectionId(), excludeScheduleId,
                 candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd())
-            : scheduleRepository.findConflictsByInstructor(
-                candidate.getInstructor().getInstructorId(),
+            : scheduleRepository.findConflictsBySection(
+                candidate.getSection().getSectionId(),
                 candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd());
-        if (!instrConflicts.isEmpty())
-            conflicts.add("Instructor '" + candidate.getInstructor().getFullName() + "' has another class at this time.");
+        if (!sectionConflicts.isEmpty())
+            conflicts.add("Section '" + candidate.getSection().getSectionName() + "' already has a class scheduled at this time.");
 
         return conflicts;
     }

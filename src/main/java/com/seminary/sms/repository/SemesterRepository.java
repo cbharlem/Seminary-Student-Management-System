@@ -44,4 +44,7 @@ public interface SemesterRepository extends JpaRepository<Semester, Integer> {
 
     // Returns all semesters ordered by school year (ascending) then semester number (ascending)
     List<Semester> findAllByOrderBySchoolYear_IndexAscSemesterNumberAsc();
+
+    // Checks if a semester with the same number already exists in a given school year (duplicate guard)
+    boolean existsBySchoolYear_SchoolYearIdAndSemesterNumber(String schoolYearId, Integer semesterNumber);
 }
