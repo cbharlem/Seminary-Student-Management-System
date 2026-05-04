@@ -1462,8 +1462,8 @@ function renderEnrStudentOptions(query) {
       e.preventDefault(); // keep focus on input until selection confirmed
       document.getElementById('enr-student').value = s.studentId;
       document.getElementById('enr-student-search').value = label;
-      const programEl = document.getElementById('enr-program');
-      if (programEl && s.program?.programId) programEl.value = s.program.programId;
+      document.getElementById('enr-program').value = s.program?.programId || '';
+      document.getElementById('enr-program-display').textContent = s.program?.programName || s.program?.programId || 'Unknown program';
       closeEnrStudentDropdown();
       autoFillEnrYearLevel(s.studentId);
     });
@@ -1521,11 +1521,13 @@ function switchEnrollTab(tab) {
 }
 
 function filterEnrSections(panel) {
-  const yearEl  = document.getElementById(panel === 'app' ? 'enr-app-year'     : 'enr-year');
-  const selectEl = document.getElementById(panel === 'app' ? 'enr-app-section' : 'enr-section');
-  if (!yearEl || !selectEl) return;
-  const year = parseInt(yearEl.value);
-  const filtered = _allEnrSections.filter(s => s.yearLevel === year);
+  const yearEl    = document.getElementById(panel === 'app' ? 'enr-app-year'    : 'enr-year');
+  const programEl = document.getElementById(panel === 'app' ? 'enr-app-program' : 'enr-program');
+  const selectEl  = document.getElementById(panel === 'app' ? 'enr-app-section' : 'enr-section');
+  if (!yearEl || !programEl || !selectEl) return;
+  const year      = parseInt(yearEl.value);
+  const programId = programEl.value;
+  const filtered  = _allEnrSections.filter(s => s.yearLevel === year && s.program?.programId === programId);
   selectEl.innerHTML = '<option value="">No section</option>';
   filtered.forEach(s => {
     const opt = document.createElement('option');
@@ -1545,6 +1547,29 @@ async function openEnrollModal() {
   const hiddenEl = document.getElementById('enr-student');
   if (searchEl) searchEl.value = '';
   if (hiddenEl) hiddenEl.value = '';
+
+  // Reset applicant panel
+  const appApplicantSel = document.getElementById('enr-applicant');
+  if (appApplicantSel) appApplicantSel.value = '';
+  const appProgramDisplay = document.getElementById('enr-app-program-display');
+  if (appProgramDisplay) appProgramDisplay.textContent = 'Select an applicant first';
+  const appProgramHidden = document.getElementById('enr-app-program');
+  if (appProgramHidden) appProgramHidden.value = '';
+  const appYearSel = document.getElementById('enr-app-year');
+  if (appYearSel) appYearSel.value = '1';
+  const appSectionSel = document.getElementById('enr-app-section');
+  if (appSectionSel) appSectionSel.innerHTML = '<option value="">No section</option>';
+
+  // Reset student panel
+  const programDisplay = document.getElementById('enr-program-display');
+  if (programDisplay) programDisplay.textContent = 'Select a student first';
+  const programHidden = document.getElementById('enr-program');
+  if (programHidden) programHidden.value = '';
+  const stdYearSel = document.getElementById('enr-year');
+  if (stdYearSel) stdYearSel.value = '1';
+  const stdSectionSel = document.getElementById('enr-section');
+  if (stdSectionSel) stdSectionSel.innerHTML = '<option value="">No section</option>';
+
   _enrStudents = [];
 
   // Load admitted applicants
@@ -1556,7 +1581,8 @@ async function openEnrollModal() {
       const opt = document.createElement('option');
       opt.value = a.applicantId;
       opt.textContent = `${a.name} — ${a.programName}`;
-      opt.dataset.programId = a.programId;
+      opt.dataset.programId   = a.programId;
+      opt.dataset.programName = a.programName;
       sel.appendChild(opt);
     });
     if (applicants.length === 0) {
@@ -1585,19 +1611,29 @@ async function openEnrollModal() {
   openModal('modal-enroll');
 }
 
+function onEnrApplicantChange() {
+  const sel = document.getElementById('enr-applicant');
+  const opt = sel.options[sel.selectedIndex];
+  const programId   = opt?.dataset?.programId   || '';
+  const programName = opt?.dataset?.programName || '';
+  document.getElementById('enr-app-program').value = programId;
+  document.getElementById('enr-app-program-display').textContent = programName || 'Select an applicant first';
+  filterEnrSections('app');
+}
+
 async function saveEnrollment() {
   if (_enrollTab === 'applicant') {
     const applicantId = document.getElementById('enr-applicant').value;
     if (!applicantId) { toast('Please select an admitted applicant', 'error'); return; }
     if (!validateRequired([
-      {id:'enr-app-program',  label:'Program'},
-      {id:'enr-app-year',     label:'Year Level'},
+      {id:'enr-app-year',    label:'Year Level'},
+      {id:'enr-app-section', label:'Section'},
     ])) return;
   } else {
     if (!validateRequired([
-      {id:'enr-student',  label:'Student'},
-      {id:'enr-program',  label:'Program'},
-      {id:'enr-year',     label:'Year Level'},
+      {id:'enr-student', label:'Student'},
+      {id:'enr-year',    label:'Year Level'},
+      {id:'enr-section', label:'Section'},
     ])) return;
   }
   if (!SMS.activeSemester) { showEnrollError('No active semester is set. Please set an active semester first.'); return; }
@@ -1610,7 +1646,6 @@ async function saveEnrollment() {
       const applicantId = document.getElementById('enr-applicant').value;
       const result = await api('/api/enrollment', 'POST', {
         applicantId,
-        programId:  document.getElementById('enr-app-program').value,
         yearLevel:  parseInt(document.getElementById('enr-app-year').value),
         sectionId:  document.getElementById('enr-app-section').value || null,
         semesterId: activeSemId,

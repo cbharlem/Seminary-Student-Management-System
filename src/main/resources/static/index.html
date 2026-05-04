@@ -972,13 +972,13 @@
       <div class="modal-grid">
         <div class="field full">
           <label for="enr-applicant">Admitted Applicant <span style="color:var(--danger)">*</span></label>
-          <select id="enr-applicant" required>
+          <select id="enr-applicant" required onchange="onEnrApplicantChange()">
             <option value="">Select admitted applicant…</option>
           </select>
         </div>
-        <div class="field"><label for="enr-app-program">Program <span style="color:var(--danger)">*</span></label><select id="enr-app-program" required><option value="PRG-1001">BA Philosophy</option><option value="PRG-1002">BA Theology</option></select></div>
+        <div class="field"><label>Program</label><div id="enr-app-program-display" style="padding:8px 10px;background:var(--surface-alt,#f5f5f5);border:1px solid var(--border);border-radius:6px;font-size:.9rem;color:var(--text-muted,#666)">Select an applicant first</div><input type="hidden" id="enr-app-program"></div>
         <div class="field"><label for="enr-app-year">Year Level <span style="color:var(--danger)">*</span></label><select id="enr-app-year" required onchange="filterEnrSections('app')"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-        <div class="field full"><label for="enr-app-section">Section</label><select id="enr-app-section"></select></div>
+        <div class="field full"><label for="enr-app-section">Section <span style="color:var(--danger)">*</span></label><select id="enr-app-section" required></select></div>
       </div>
       <div style="background:var(--info-bg);color:var(--info);font-size:.8rem;padding:10px 12px;border-radius:6px;margin-top:4px">
         Enrolling an admitted applicant will create their student record and user account. Credentials will be shown on screen and emailed if an email is on file.
@@ -999,9 +999,9 @@
             <div id="enr-student-list" class="enr-student-list" role="listbox"></div>
           </div>
         </div>
-        <div class="field"><label for="enr-program">Program <span style="color:var(--danger)">*</span></label><select id="enr-program" required><option value="PRG-1001">BA Philosophy</option><option value="PRG-1002">BA Theology</option></select></div>
+        <div class="field"><label>Program</label><div id="enr-program-display" style="padding:8px 10px;background:var(--surface-alt,#f5f5f5);border:1px solid var(--border);border-radius:6px;font-size:.9rem;color:var(--text-muted,#666)">Select a student first</div><input type="hidden" id="enr-program"></div>
         <div class="field"><label for="enr-year">Year Level <span style="color:var(--danger)">*</span></label><select id="enr-year" required onchange="filterEnrSections('std')"><option>1</option><option>2</option><option>3</option><option>4</option></select><span id="enr-year-hint" style="font-size:.72rem;margin-top:4px;display:block;min-height:1em"></span></div>
-        <div class="field full"><label for="enr-section">Section</label><select id="enr-section"></select></div>
+        <div class="field full"><label for="enr-section">Section <span style="color:var(--danger)">*</span></label><select id="enr-section" required></select></div>
       </div>
     </div>
 

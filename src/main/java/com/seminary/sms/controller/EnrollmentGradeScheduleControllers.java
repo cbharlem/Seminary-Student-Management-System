@@ -115,12 +115,13 @@ class EnrollmentController {
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> enroll(@RequestBody Map<String, String> body) {
         try {
-            Program program = programRepository.findByProgramId(body.get("programId"))
-                .orElseThrow(() -> new RuntimeException("Program not found"));
             Semester semester = semesterRepository.findBySemesterId(body.get("semesterId"))
                 .orElseThrow(() -> new RuntimeException("Semester not found"));
-            Section section = body.containsKey("sectionId") && body.get("sectionId") != null && !body.get("sectionId").isBlank()
-                ? sectionRepository.findBySectionId(body.get("sectionId")).orElse(null) : null;
+            String rawSectionId = body.get("sectionId");
+            if (rawSectionId == null || rawSectionId.isBlank())
+                throw new RuntimeException("Section is required.");
+            Section section = sectionRepository.findBySectionId(rawSectionId)
+                .orElseThrow(() -> new RuntimeException("Section not found"));
             // SECURITY (A07): Validate yearLevel bounds to prevent corrupt data
             int yearLevel = Integer.parseInt(body.getOrDefault("yearLevel", "1"));
             if (yearLevel < 1 || yearLevel > 10)
@@ -133,6 +134,10 @@ class EnrollmentController {
                     .orElseThrow(() -> new RuntimeException("Applicant not found"));
                 Application application = applicationRepository.findByApplicant_ApplicantId(applicantId)
                     .orElseThrow(() -> new RuntimeException("Application not found"));
+                // Derive program from the applicant's own record — never trust the client for this
+                Program program = applicant.getAppliedProgram();
+                if (program == null)
+                    throw new RuntimeException("Applicant has no program on record.");
 
                 if (application.getApplicationStatus() != Application.ApplicationStatus.Admitted) {
                     return ResponseEntity.badRequest().body(Map.of("error", "Applicant must be in Admitted status before enrolling."));
@@ -205,6 +210,10 @@ class EnrollmentController {
             // ── Re-enrollment of existing student ─────────────────────────────
             Student student = studentRepository.findByStudentId(body.get("studentId"))
                 .orElseThrow(() -> new RuntimeException("Student not found"));
+            // Derive program from the student's own record — never trust the client for this
+            Program program = student.getProgram();
+            if (program == null)
+                throw new RuntimeException("Student has no program on record.");
             Enrollment enrolled = enrollmentService.enroll(student, program, semester, section, yearLevel);
             auditService.log("CREATE", "Enrollment", "Enrolled student " + student.getStudentId() + " in semester " + semester.getSemesterId());
             return ResponseEntity.ok(Map.of("enrollment", enrolled, "isFirstEnrollment", false));
