@@ -380,9 +380,9 @@ class EnrollmentController {
 
             java.util.LinkedHashMap<String, java.util.HashMap<String, Object>> resultMap = new java.util.LinkedHashMap<>();
 
-            // 1. Courses for the student's current year level and semester
+            // 1. Courses for the student's current year level and semester — scoped to the active curriculum only
             List<Course> semesterCourses = courseRepository
-                .findByProgram_ProgramIdAndYearLevelAndSemesterNumberAndIsActiveTrue(
+                .findByCurriculum_IsActiveTrueAndProgram_ProgramIdAndYearLevelAndSemesterNumberAndIsActiveTrue(
                     programId, yearLevel, semesterNumber);
 
             for (Course c : semesterCourses) {
@@ -414,7 +414,7 @@ class EnrollmentController {
             everTakenCourseIds.addAll(failedCourseIds);
             everTakenCourseIds.addAll(alreadyEnrolled);
 
-            courseRepository.findByProgram_ProgramIdAndIsActiveTrue(programId)
+            courseRepository.findByCurriculum_IsActiveTrueAndProgram_ProgramIdAndIsActiveTrue(programId)
                 .stream()
                 .filter(c -> c.getYearLevel() < yearLevel
                              && c.getSemesterNumber().equals(semesterNumber)
@@ -581,6 +581,15 @@ class GradeController {
                 if (student != null && student.getCurrentStatus() == Student.StudentStatus.Alumni)
                     return ResponseEntity.badRequest().body(Map.of("error", "Cannot create grades for a graduated student."));
             }
+            java.math.BigDecimal MIN = new java.math.BigDecimal("1.0"), MAX = new java.math.BigDecimal("5.0");
+            if (grade.getMidtermClassStanding() != null && (grade.getMidtermClassStanding().compareTo(MIN) < 0 || grade.getMidtermClassStanding().compareTo(MAX) > 0))
+                return ResponseEntity.badRequest().body(Map.of("error", "Midterm class standing must be between 1.0 and 5.0"));
+            if (grade.getMidtermExam() != null && (grade.getMidtermExam().compareTo(MIN) < 0 || grade.getMidtermExam().compareTo(MAX) > 0))
+                return ResponseEntity.badRequest().body(Map.of("error", "Midterm exam grade must be between 1.0 and 5.0"));
+            if (grade.getFinalClassStanding() != null && (grade.getFinalClassStanding().compareTo(MIN) < 0 || grade.getFinalClassStanding().compareTo(MAX) > 0))
+                return ResponseEntity.badRequest().body(Map.of("error", "Final class standing must be between 1.0 and 5.0"));
+            if (grade.getFinalExam() != null && (grade.getFinalExam().compareTo(MIN) < 0 || grade.getFinalExam().compareTo(MAX) > 0))
+                return ResponseEntity.badRequest().body(Map.of("error", "Final exam grade must be between 1.0 and 5.0"));
             User user = userRepository.findByUsername(auth.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
             Grade saved = gradeService.saveGrade(grade, user);

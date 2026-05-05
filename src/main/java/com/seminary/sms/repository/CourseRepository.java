@@ -59,4 +59,10 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     // Auto-generates: JOIN tblcurriculum WHERE fldCurriculumID = ?  (includes inactive courses)
     // Called by: createCurriculum() copy-from logic to duplicate all courses to a new curriculum
     List<Course> findByCurriculum_CurriculumId(String curriculumId);
+
+    // Filters by active curriculum — prevents duplicate courses appearing when a new curriculum copies from an old one
+    List<Course> findByCurriculum_IsActiveTrueAndProgram_ProgramIdAndYearLevelAndSemesterNumberAndIsActiveTrue(
+        String programId, Integer yearLevel, Integer semesterNumber);
+
+    List<Course> findByCurriculum_IsActiveTrueAndProgram_ProgramIdAndIsActiveTrue(String programId);
 }

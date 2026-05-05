@@ -120,6 +120,15 @@
   .login-blocked.show { display:block; }
   .login-blocked strong { display:block; font-size:0.95rem; margin-bottom:4px; }
   .login-blocked .countdown { font-weight:600; font-variant-numeric:tabular-nums; }
+  .login-disabled {
+    width:100%; max-width:400px; margin-bottom:16px;
+    padding:14px 16px; border-radius:8px;
+    background:#fef2f2; color:#991b1b;
+    border:1.5px solid #fca5a5;
+    font-size:0.875rem; display:none; line-height:1.6;
+  }
+  .login-disabled.show { display:block; }
+  .login-disabled strong { display:block; font-size:0.95rem; margin-bottom:4px; }
   .btn-login:disabled {
     background:var(--gray-300,#d1d5db); color:var(--gray-500,#6b7280);
     cursor:not-allowed;
@@ -150,6 +159,10 @@
   <h2>Welcome Back!</h2>
   <p class="login-sub">Sign in to your account</p>
   <div class="login-error" id="login-error" role="alert" aria-live="polite">Invalid username or password. Please try again.</div>
+  <div class="login-disabled" id="login-disabled" role="alert" aria-live="polite">
+    <strong>Account Disabled</strong>
+    Your account has been disabled. Please contact the administrator for assistance.
+  </div>
   <div class="login-blocked" id="login-blocked" role="alert" aria-live="polite">
     <strong>Too many failed attempts</strong>
     Your account has been temporarily locked for security reasons.
@@ -215,13 +228,21 @@
     if (e.key === 'Enter' && !btnLogin.disabled) doLogin();
   });
 
-  // Show error/logout/blocked messages from URL params (set by Spring Security redirects)
+  // Show error/logout/blocked/disabled messages from URL params (set by Spring Security redirects)
   const params  = new URLSearchParams(window.location.search);
   const errBox  = document.getElementById('login-error');
   const blocked = document.getElementById('login-blocked');
+  const disabledBox = document.getElementById('login-disabled');
   const btnLogin = document.querySelector('.btn-login');
   const usernameInput = document.getElementById('username');
   const passwordInput = document.getElementById('password');
+
+  if (params.get('disabled')) {
+    disabledBox.classList.add('show');
+    btnLogin.disabled = true;
+    usernameInput.disabled = true;
+    passwordInput.disabled = true;
+  }
 
   if (params.get('error')) {
     errBox.style.background = ''; errBox.style.color = '';

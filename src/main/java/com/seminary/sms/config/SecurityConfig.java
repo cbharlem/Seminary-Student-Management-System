@@ -55,6 +55,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -178,6 +179,10 @@ public class SecurityConfig {
      */
     private AuthenticationFailureHandler loginFailureHandler() {
         return (request, response, exception) -> {
+            if (exception instanceof DisabledException) {
+                response.sendRedirect("/login.html?disabled=true");
+                return;
+            }
             String username = request.getParameter("username");
             if (username != null && !username.isBlank()) {
                 String trimmed = username.trim();
@@ -201,11 +206,12 @@ public class SecurityConfig {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
             if (!user.getIsActive()) {
                 auditService.logSecurity(username, "INACTIVE_LOGIN_ATTEMPT", "Login attempted on a disabled account");
-                throw new UsernameNotFoundException("Account is inactive.");
             }
             return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPasswordHash(),
+                user.getIsActive(),
+                true, true, true,
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
             );
         };

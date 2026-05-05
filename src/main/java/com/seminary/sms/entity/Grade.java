@@ -111,28 +111,40 @@ public class Grade {
      * Skips computation if status is manually set to Incomplete or Dropped.
      */
     public void computeFinalRating() {
-        if (gradeStatus == GradeStatus.Incomplete || gradeStatus == GradeStatus.Dropped) return;
+        if (gradeStatus == GradeStatus.Incomplete || gradeStatus == GradeStatus.Dropped) {
+            midtermGrade = null;
+            finalGrade   = null;
+            finalRating  = null;
+            return;
+        }
 
-        // Compute midterm term grade from components
+        // Compute midterm term grade — clear it if inputs are missing
         if (midtermClassStanding != null && midtermExam != null) {
             midtermGrade = midtermClassStanding.multiply(new BigDecimal("0.60"))
                 .add(midtermExam.multiply(new BigDecimal("0.40")))
                 .setScale(2, java.math.RoundingMode.HALF_UP);
+        } else {
+            midtermGrade = null;
         }
 
-        // Compute final term grade from components
+        // Compute final term grade — clear it if inputs are missing
         if (finalClassStanding != null && finalExam != null) {
             finalGrade = finalClassStanding.multiply(new BigDecimal("0.60"))
                 .add(finalExam.multiply(new BigDecimal("0.40")))
                 .setScale(2, java.math.RoundingMode.HALF_UP);
+        } else {
+            finalGrade = null;
         }
 
-        // Compute course final rating from both term grades
+        // Compute course final rating — clear it if either term grade is missing
         if (midtermGrade != null && finalGrade != null) {
             finalRating = midtermGrade.add(finalGrade)
                 .divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP);
             gradeStatus = finalRating.compareTo(new BigDecimal("3.0")) <= 0
                 ? GradeStatus.Passed : GradeStatus.Failed;
+        } else {
+            finalRating = null;
+            gradeStatus = GradeStatus.NotYetGraded;
         }
     }
 

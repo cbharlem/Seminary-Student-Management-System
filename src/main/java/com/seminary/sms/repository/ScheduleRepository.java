@@ -88,6 +88,12 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     // Called by: CurriculumController.updateCourse() to block structural edits to scheduled courses
     boolean existsByCourse_CourseId(String courseId);
 
+    // Checks if an instructor has any assigned schedules — used to block deletion
+    boolean existsByInstructor_InstructorId(String instructorId);
+
+    // Returns all schedules for an instructor by business ID — used to list conflicts on delete attempt
+    List<Schedule> findByInstructor_InstructorId(String instructorId);
+
     // Section conflict checks — prevents the same section from having overlapping classes on the same day
     @Query("SELECT s FROM Schedule s WHERE s.section.sectionId = :sectionId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
     List<Schedule> findConflictsBySection(@Param("sectionId") String sectionId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);

@@ -164,6 +164,18 @@ class CurriculumController {
         return ResponseEntity.ok(newCur);
     }
 
+    @PatchMapping("/curricula/{id}/activate")
+    @PreAuthorize("hasRole('Registrar')")
+    @Transactional
+    public ResponseEntity<?> activateCurriculum(@PathVariable String id) {
+        Curriculum target = curriculumVersionRepository.findByCurriculumId(id).orElse(null);
+        if (target == null) return ResponseEntity.notFound().build();
+        curriculumVersionRepository.findByProgram_ProgramIdAndIsActiveTrue(target.getProgram().getProgramId())
+            .ifPresent(cur -> { cur.setIsActive(false); curriculumVersionRepository.save(cur); });
+        target.setIsActive(true);
+        return ResponseEntity.ok(curriculumVersionRepository.save(target));
+    }
+
     // LAYER 1 → LAYER 2: Triggered by app.js when dropdowns or the curriculum page need the list of active programs
     // LAYER 2 → LAYER 4: Calls programRepository.findByIsActiveTrue() — no service needed here
     // LAYER 2 → LAYER 1: Returns a JSON list of active Program objects
@@ -316,6 +328,7 @@ class SectionController {
     private final RoomRepository roomRepository;
     private final ProgramRepository programRepository;
     private final SemesterRepository semesterRepository;
+    private final ScheduleRepository scheduleRepository;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadSections() and dropdowns needing available sections
     // LAYER 2 → LAYER 4: Calls sectionRepository filtered by semester if provided; filters to active only
@@ -427,15 +440,27 @@ class SectionController {
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteInstructor() when the registrar confirms deletion
-    // LAYER 2 → LAYER 4: Soft-deletes by setting isActive = false (record is kept, hidden from lists)
+    // LAYER 2 → LAYER 4: Blocked if instructor has active schedules — otherwise soft-deletes
     @DeleteMapping("/instructors/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Void> deleteInstructor(@PathVariable String id) {
-        return instructorRepository.findByInstructorId(id).map(existing -> {
-            existing.setIsActive(false);
-            instructorRepository.save(existing);
-            return ResponseEntity.ok().<Void>build();
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> deleteInstructor(@PathVariable String id) {
+        Instructor existing = instructorRepository.findByInstructorId(id).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
+        List<Schedule> schedules = scheduleRepository.findByInstructor_InstructorId(id);
+        if (!schedules.isEmpty()) {
+            List<String> details = schedules.stream()
+                .map(s -> s.getCourse() != null && s.getSection() != null
+                    ? s.getCourse().getCourseCode() + " — " + s.getSection().getSectionName()
+                    : s.getScheduleId())
+                .toList();
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Cannot delete instructor — they have " + schedules.size() + " active schedule(s). Reassign them first.",
+                "schedules", details
+            ));
+        }
+        existing.setIsActive(false);
+        instructorRepository.save(existing);
+        return ResponseEntity.ok().<Void>build();
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadRooms() and schedule modal dropdowns
@@ -621,10 +646,12 @@ class UserController {
     // LAYER 2 → LAYER 1: Returns a JSON with the new isActive value
     @PatchMapping("/{userId}/toggle")
     @PreAuthorize("hasRole('Admin')")
-    public ResponseEntity<?> toggle(@PathVariable String userId) {
+    public ResponseEntity<?> toggle(@PathVariable String userId, Authentication auth) {
         // SECURITY (A01): Use business key (userId) instead of sequential integer to prevent IDOR
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getUsername().equals(auth.getName()))
+            return ResponseEntity.badRequest().body(Map.of("error", "You cannot disable your own account."));
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
         auditService.log("UPDATE", "User", (user.getIsActive() ? "Enabled" : "Disabled") + " user account: " + user.getUsername());

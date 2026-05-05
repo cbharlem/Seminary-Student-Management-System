@@ -698,6 +698,9 @@ function renderCurriculaSelector(programId) {
   badgeEl.innerHTML = cur
     ? (cur.isActive ? badge('Active', 'success') : badge('Historical', 'warn'))
     : '';
+  const activateBtnId = programId === 'PRG-1001' ? 'philo-curriculum-activate-btn' : 'theo-curriculum-activate-btn';
+  const activateBtn = document.getElementById(activateBtnId);
+  if (activateBtn) activateBtn.style.display = cur && !cur.isActive ? '' : 'none';
 }
 
 // Fetches courses for the currently selected curriculum version and renders the table.
@@ -713,6 +716,16 @@ async function loadCurriculum(programId) {
     renderCurriculumTable(programId);
     _updateAddCourseButtonState(programId);
   } catch (e) { console.error(e); }
+}
+
+async function activateCurriculum(programId) {
+  const curriculumId = _selectedCurriculum[programId];
+  if (!curriculumId) return;
+  try {
+    await api(`/api/curriculum/curricula/${curriculumId}/activate`, 'PATCH');
+    toast('Curriculum set as active');
+    await loadCurricula(programId);
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 // Disables the "+ Add Course" button when viewing a historical (non-active) curriculum.
@@ -858,13 +871,18 @@ async function loadGrades() {
   try {
     // Populate semester dropdown on first load
     const semEl = document.getElementById('grade-filter-sem');
-    if (semEl && semEl.options.length <= 1) {
+    if (semEl && semEl.options.length === 0) {
       try {
-        const semesters = await api('/api/school-years/semesters');
+        const [semesters, activeSem] = await Promise.all([
+          api('/api/school-years/semesters'),
+          SMS.activeSemester ? Promise.resolve(SMS.activeSemester) : api('/api/school-years/semesters/active').catch(() => null)
+        ]);
+        if (!SMS.activeSemester && activeSem) SMS.activeSemester = activeSem;
         semesters.forEach(s => {
           const opt = document.createElement('option');
           opt.value = s.semesterId;
-          opt.textContent = s.semesterLabel;
+          const activeMark = SMS.activeSemester?.semesterId === s.semesterId ? ' (Active)' : '';
+          opt.textContent = s.semesterLabel + activeMark;
           semEl.appendChild(opt);
         });
       } catch (_) {}
@@ -1091,7 +1109,7 @@ async function loadUsers() {
         <td>${badge(u.role, u.role==='Registrar' ? 'info' : 'gray')}</td>
         <td>${badge(u.isActive ? 'Active' : 'Inactive', u.isActive ? 'success' : 'danger')}</td>
         <td>
-          <button class="btn btn-outline btn-sm" onclick="toggleUser('${escHtml(u.userId)}')">Toggle</button>
+          ${u.userId !== SMS.currentUser?.userId ? `<button class="btn ${u.isActive ? 'btn-danger' : 'btn-outline'} btn-sm" onclick="toggleUser('${escHtml(u.userId)}')">${u.isActive ? 'Disable' : 'Enable'}</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="resetPw('${escHtml(u.userId)}')">Reset PW</button>
         </td>
       </tr>`
@@ -1887,8 +1905,51 @@ function editGrade(id, student, course, mtCS, mtExam, fnCS, fnExam, mtGrade, fnG
   document.getElementById('gr-fn-grade').textContent = fnGrade || '—';
   document.getElementById('gr-status').value   = status;
   document.getElementById('gr-remarks').value  = remarks;
+  _updateGradeStatusBadge(status);
+  _setGradeInputsDisabled(status === 'Incomplete' || status === 'Dropped');
   recomputeGradeModal();
   openModal('modal-grade');
+}
+
+function toggleGradeOverride(newStatus) {
+  const statusEl = document.getElementById('gr-status');
+  const current  = statusEl.value;
+  // Toggle off if already active
+  const resolved = current === newStatus ? 'NotYetGraded' : newStatus;
+  statusEl.value = resolved;
+  _updateGradeStatusBadge(resolved);
+  _setGradeInputsDisabled(resolved === 'Incomplete' || resolved === 'Dropped');
+  if (resolved === 'Incomplete' || resolved === 'Dropped') {
+    ['gr-mt-cs','gr-mt-exam','gr-fn-cs','gr-fn-exam'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('gr-mt-grade').textContent = '—';
+    document.getElementById('gr-fn-grade').textContent = '—';
+    document.getElementById('gr-final-rating').textContent = '—';
+    document.getElementById('gr-final-rating').className = 'grade-final-val';
+  } else {
+    recomputeGradeModal();
+  }
+}
+
+function _setGradeInputsDisabled(disabled) {
+  ['gr-mt-cs','gr-mt-exam','gr-fn-cs','gr-fn-exam'].forEach(id => {
+    document.getElementById(id).disabled = disabled;
+  });
+  document.getElementById('btn-mark-incomplete').classList.toggle('btn-warning', document.getElementById('gr-status').value === 'Incomplete');
+  document.getElementById('btn-mark-dropped').classList.toggle('btn-danger', document.getElementById('gr-status').value === 'Dropped');
+}
+
+function _updateGradeStatusBadge(status) {
+  const badge = document.getElementById('gr-status-badge');
+  if (!badge) return;
+  const map = {
+    Passed: ['Passed', 'success'], Failed: ['Failed', 'danger'],
+    Incomplete: ['Incomplete', 'warn'], Dropped: ['Dropped', 'danger'],
+    NotYetGraded: ['Not Yet Graded', 'gray']
+  };
+  const [label, type] = map[status] || ['Unknown', 'gray'];
+  const colors = { success:'#16a34a', danger:'#dc2626', warn:'#d97706', gray:'#6b7280' };
+  badge.textContent = label;
+  badge.style.color = colors[type] || colors.gray;
 }
 
 // SECURITY (A03): Reads grade data from data-* attributes instead of inline onclick strings.
@@ -1943,11 +2004,12 @@ function recomputeGradeModal() {
   ratingEl.textContent = fmt(rating);
   ratingEl.className = 'grade-final-val' + (rating !== null ? (rating <= 3.0 ? ' grade-pass' : ' grade-fail') : '');
 
-  // Auto-set status when both term grades are complete
-  if (rating !== null) {
-    const statusEl = document.getElementById('gr-status');
-    if (statusEl.value !== 'Incomplete' && statusEl.value !== 'Dropped')
-      statusEl.value = rating <= 3.0 ? 'Passed' : 'Failed';
+  // Auto-set status based on computed rating (unless manually overridden)
+  const statusEl = document.getElementById('gr-status');
+  if (statusEl.value !== 'Incomplete' && statusEl.value !== 'Dropped') {
+    const computed = rating !== null ? (rating <= 3.0 ? 'Passed' : 'Failed') : 'NotYetGraded';
+    statusEl.value = computed;
+    _updateGradeStatusBadge(computed);
   }
 }
 

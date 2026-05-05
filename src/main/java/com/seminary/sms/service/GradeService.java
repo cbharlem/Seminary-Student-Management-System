@@ -102,11 +102,12 @@ public class GradeService {
         if (saved.getEnrollmentSubject() != null) {
             EnrollmentSubject es = saved.getEnrollmentSubject();
             switch (saved.getGradeStatus()) {
-                case Passed     -> es.setStatus(EnrollmentSubject.SubjectStatus.Completed);
-                case Failed     -> es.setStatus(EnrollmentSubject.SubjectStatus.Failed);
-                case Incomplete -> es.setStatus(EnrollmentSubject.SubjectStatus.Incomplete);
-                case Dropped    -> es.setStatus(EnrollmentSubject.SubjectStatus.Dropped);
-                default         -> {}
+                case Passed        -> es.setStatus(EnrollmentSubject.SubjectStatus.Completed);
+                case Failed        -> es.setStatus(EnrollmentSubject.SubjectStatus.Failed);
+                case Incomplete    -> es.setStatus(EnrollmentSubject.SubjectStatus.Incomplete);
+                case Dropped       -> es.setStatus(EnrollmentSubject.SubjectStatus.Dropped);
+                case NotYetGraded  -> es.setStatus(EnrollmentSubject.SubjectStatus.Enrolled);
+                default            -> {}
             }
             enrollmentSubjectRepository.save(es);
         }

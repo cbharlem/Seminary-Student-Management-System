@@ -412,6 +412,7 @@
       <div class="search-bar">
         <select class="form-select" id="philo-curriculum-select" onchange="onCurriculumChange('PRG-1001',this.value)"></select>
         <span id="philo-curriculum-badge"></span>
+        <button id="philo-curriculum-activate-btn" class="btn btn-success btn-sm" style="display:none" onclick="activateCurriculum('PRG-1001')">Set Active</button>
       </div>
     </div>
     <div class="card-body">
@@ -434,6 +435,7 @@
       <div class="search-bar">
         <select class="form-select" id="theo-curriculum-select" onchange="onCurriculumChange('PRG-1002',this.value)"></select>
         <span id="theo-curriculum-badge"></span>
+        <button id="theo-curriculum-activate-btn" class="btn btn-success btn-sm" style="display:none" onclick="activateCurriculum('PRG-1002')">Set Active</button>
       </div>
     </div>
     <div class="card-body">
@@ -504,7 +506,7 @@
           <input class="search-input" id="grade-student-search" placeholder="Search student…" aria-label="Search student by name or ID" oninput="filterGradeStudents(this.value)" onkeydown="onGradeSearchKeydown(event)" autocomplete="off"/>
           <div class="grade-suggestions" id="grade-suggestions"></div>
         </div>
-        <select class="form-select" id="grade-filter-sem" onchange="loadGrades()"><option value="">Active Semester</option></select>
+        <select class="form-select" id="grade-filter-sem" onchange="loadGrades()"></select>
       </div>
     </div>
     <div class="card-body"><table><thead><tr><th>Course</th><th style="text-align:center">Units</th><th>Midterm</th><th>Final</th><th>Rating</th><th>Status</th><th>Action</th></tr></thead><tbody id="tbl-grades"><tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:20px">Loading...</td></tr></tbody></table></div>
@@ -1052,8 +1054,18 @@
       <span id="gr-final-rating" class="grade-final-val">—</span>
     </div>
     <div class="modal-grid" style="margin-top:12px">
-      <div class="field"><label for="gr-status">Status</label><select id="gr-status"><option value="NotYetGraded">Not Yet Graded</option><option value="Passed">Passed</option><option value="Failed">Failed</option><option value="Incomplete">Incomplete</option><option value="Dropped">Dropped</option></select></div>
-      <div class="field"><label for="gr-remarks">Remarks</label><input id="gr-remarks"/></div>
+      <input type="hidden" id="gr-status"/>
+      <div class="field full">
+        <label>Status</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <span id="gr-status-badge" style="font-weight:600;font-size:1rem"></span>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="btn-mark-incomplete" class="btn btn-outline btn-sm" onclick="toggleGradeOverride('Incomplete')">Mark Incomplete</button>
+            <button type="button" id="btn-mark-dropped" class="btn btn-outline btn-sm" onclick="toggleGradeOverride('Dropped')">Mark Dropped</button>
+          </div>
+        </div>
+      </div>
+      <div class="field full"><label for="gr-remarks">Remarks</label><input id="gr-remarks"/></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-grade')">Cancel</button>
