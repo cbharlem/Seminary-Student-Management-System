@@ -65,4 +65,8 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
         String programId, Integer yearLevel, Integer semesterNumber);
 
     List<Course> findByCurriculum_IsActiveTrueAndProgram_ProgramIdAndIsActiveTrue(String programId);
+
+    // Counts only courses that belong to an active curriculum version and are themselves active
+    // Used by: DashboardController to show "Active Courses" stat
+    long countByCurriculum_IsActiveTrueAndIsActiveTrue();
 }

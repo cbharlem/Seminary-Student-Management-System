@@ -673,9 +673,11 @@ async function loadCurricula(programId) {
   try {
     const data = await api(`/api/curriculum/curricula?program=${programId}`);
     _curricula[programId] = data;
-    const active = data.find(c => c.isActive) || data[0];
+    const active = data.find(c => c.isActive);
     if (active) {
       _selectedCurriculum[programId] = active.curriculumId;
+    } else if (data.length && !_selectedCurriculum[programId]) {
+      _selectedCurriculum[programId] = data[0].curriculumId;
     }
     renderCurriculaSelector(programId);
     await loadCurriculum(programId);
@@ -695,9 +697,7 @@ function renderCurriculaSelector(programId) {
   const selected = _selectedCurriculum[programId];
   if (selected) sel.value = selected;
   const cur = (_curricula[programId] || []).find(c => c.curriculumId === selected);
-  badgeEl.innerHTML = cur
-    ? (cur.isActive ? badge('Active', 'success') : badge('Historical', 'warn'))
-    : '';
+  badgeEl.innerHTML = cur?.isActive ? badge('Active', 'success') : '';
   const activateBtnId = programId === 'PRG-1001' ? 'philo-curriculum-activate-btn' : 'theo-curriculum-activate-btn';
   const activateBtn = document.getElementById(activateBtnId);
   if (activateBtn) activateBtn.style.display = cur && !cur.isActive ? '' : 'none';
@@ -1196,7 +1196,7 @@ async function loadBackup() {
     if (!Array.isArray(data) || !data.length) return;
     const tbody = document.getElementById('tbl-backup');
     tbody.innerHTML = data.map(b =>
-      `<tr><td>${fmtDate(b.backupDate)}</td><td>${b.backupType}</td><td>${b.performedBy?.username || '—'}</td><td>${b.notes || '—'}</td></tr>`
+      `<tr><td>${fmtDate(b.backupDate)}</td><td>${escHtml(b.backupType)}</td><td>${escHtml(b.performedBy?.username || '—')}</td><td>${escHtml(b.notes || '—')}</td></tr>`
     ).join('');
   } catch (_) {}
 }
@@ -2015,7 +2015,8 @@ function recomputeGradeModal() {
 
 function openCourseModal(courseIdOrNull) {
   const c         = courseIdOrNull ? _courseMap[courseIdOrNull] : null;
-  const programId = c?.program?.programId || 'PRG-1001';
+  const programId = c?.program?.programId ||
+    (document.getElementById('curr-theo')?.style.display !== 'none' ? 'PRG-1002' : 'PRG-1001');
 
   document.getElementById('co-id').value      = c?.courseId  || '';
   document.getElementById('co-code').value    = c?.courseCode || '';
@@ -2157,7 +2158,7 @@ async function saveNewCurriculum() {
       label,
       copyFromCurriculumId: copyFromId || null,
     });
-    toast('Curriculum created and set as active');
+    toast('Curriculum created as draft. Add courses then click "Set Active".');
     closeModal('modal-new-curriculum');
     await loadCurricula(programId);
   } catch (e) { toast(e.message, 'error'); }

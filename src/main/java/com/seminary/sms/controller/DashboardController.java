@@ -59,7 +59,7 @@ public class DashboardController {
 
         long activeStudents = studentRepository.countByCurrentStatus(Student.StudentStatus.Active);
         long totalApplicants = applicantRepository.count();
-        long activeCourses = courseRepository.findByIsActiveTrue().size();
+        long activeCourses = courseRepository.countByCurriculum_IsActiveTrueAndIsActiveTrue();
         long totalAlumni = alumniRepository.count();
 
         stats.put("activeStudents", activeStudents);

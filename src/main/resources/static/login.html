@@ -168,21 +168,23 @@
     Your account has been temporarily locked for security reasons.
     Please try again in <span class="countdown" id="countdown">15:00</span>.
   </div>
+  <form id="login-form" method="POST" action="/login" style="width:100%;display:contents">
   <div class="form-group">
     <label for="username">Username</label>
-    <input type="text" id="username" placeholder="Enter Username" autocomplete="username"/>
+    <input type="text" id="username" name="username" placeholder="Enter Username" autocomplete="username"/>
   </div>
   <div class="form-group">
     <label for="password">Password</label>
     <div class="password-wrapper">
-      <input type="password" id="password" placeholder="Enter Password" autocomplete="current-password"/>
+      <input type="password" id="password" name="password" placeholder="Enter Password" autocomplete="current-password"/>
       <button type="button" class="toggle-password" onclick="togglePassword()" title="Show/hide password">
         <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg id="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
       </button>
     </div>
   </div>
-  <button class="btn-login" onclick="doLogin()">Sign In</button>
+  <button type="submit" class="btn-login" id="btn-login-submit">Sign In</button>
+  </form>
 
   <div style="text-align:right;width:100%;max-width:400px;margin-top:8px">
     <a href="/forgot-password.html" style="font-size:0.82rem;color:var(--accent);text-decoration:underline;text-underline-offset:3px;font-weight:500;border-radius:4px;outline-offset:3px">
@@ -223,19 +225,20 @@
     }
   }
 
-  // Listen for Enter key — only if login button is not disabled
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !btnLogin.disabled) doLogin();
-  });
-
   // Show error/logout/blocked/disabled messages from URL params (set by Spring Security redirects)
   const params  = new URLSearchParams(window.location.search);
   const errBox  = document.getElementById('login-error');
   const blocked = document.getElementById('login-blocked');
   const disabledBox = document.getElementById('login-disabled');
-  const btnLogin = document.querySelector('.btn-login');
+  const btnLogin = document.getElementById('btn-login-submit');
+  const loginForm = document.getElementById('login-form');
   const usernameInput = document.getElementById('username');
   const passwordInput = document.getElementById('password');
+
+  loginForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    doLogin();
+  });
 
   if (params.get('disabled')) {
     disabledBox.classList.add('show');
@@ -322,24 +325,15 @@
   }
 
   function doLogin() {
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
     if (!username || !password) {
       errBox.style.background = ''; errBox.style.color = '';
       errBox.textContent = 'Please enter both username and password.';
       errBox.classList.add('show');
       return;
     }
-    // Submit the form directly to Spring Boot's /login endpoint
-    // Spring Security handles authentication and redirects to /index.html on success
-    // /login is excluded from CSRF in SecurityConfig — no token needed here
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/login';
-    const u = document.createElement('input'); u.name = 'username'; u.value = username; form.appendChild(u);
-    const p = document.createElement('input'); p.name = 'password'; p.value = password; form.appendChild(p);
-    document.body.appendChild(form);
-    form.submit();
+    loginForm.submit();
   }
 </script>
 </body>

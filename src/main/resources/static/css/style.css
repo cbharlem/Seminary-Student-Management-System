@@ -371,7 +371,7 @@ body.admin-view .registrar-only { display: none !important; }
 .modal {
   background: white; border-radius: 14px;
   width: 620px; max-width: 95vw;
-  max-height: 90vh; overflow-y: auto;
+  max-height: 90vh; overflow-y: auto; overflow-x: hidden;
   padding: 32px;
 }
 .modal h3 {
@@ -381,7 +381,7 @@ body.admin-view .registrar-only { display: none !important; }
 .modal-sub { font-size: 0.83rem; color: var(--gray-400); margin-bottom: 24px; }
 .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .modal-grid .full { grid-column: 1 / -1; }
-.field { display: flex; flex-direction: column; gap: 6px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label { font-size: 0.8rem; font-weight: 500; color: var(--gray-600); }
 .field input, .field select, .field textarea {
   padding: 9px 13px; border: 1.5px solid var(--gray-200);

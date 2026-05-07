@@ -82,6 +82,7 @@ class CurriculumController {
     private final EnrollmentSubjectRepository enrollmentSubjectRepository;
     private final GradeRepository gradeRepository;
     private final ScheduleRepository scheduleRepository;
+    private final SemesterRepository semesterRepository;
 
     // LAYER 1 → LAYER 2: Called by app.js loadCurricula() to populate the version selector dropdown
     // LAYER 2 → LAYER 4: Fetches all curriculum versions for a program, newest first
@@ -95,30 +96,36 @@ class CurriculumController {
     }
 
     // LAYER 1 → LAYER 2: Called by app.js saveNewCurriculum() when registrar creates a new curriculum version
-    // LAYER 2 → LAYER 4: Deactivates the current active curriculum, creates the new one, and optionally
-    //   copies all courses and prerequisites from a source curriculum into the new one.
+    // LAYER 2 → LAYER 4: Creates the new curriculum as an inactive draft. The registrar must manually
+    //   activate it via PATCH /activate once all courses and prerequisites have been added.
+    //   Optionally copies courses and prerequisites from a source curriculum.
     // LAYER 2 → LAYER 1: Returns the newly created Curriculum JSON
     @PostMapping("/curricula")
     @PreAuthorize("hasRole('Registrar')")
     @Transactional
-    public ResponseEntity<Curriculum> createCurriculum(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> createCurriculum(@RequestBody Map<String, String> body) {
         String programId  = body.get("programId");
         String label      = body.get("label");
         String copyFromId = body.get("copyFromCurriculumId");
 
+        // Option A: block if enrollment is currently open
+        boolean enrollmentOpen = semesterRepository.findByIsActiveTrue()
+            .map(s -> Boolean.TRUE.equals(s.getEnrollmentOpen()))
+            .orElse(false);
+        if (enrollmentOpen) {
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot create a new curriculum while enrollment is open. Close enrollment first."));
+        }
+
         Program program = programRepository.findByProgramId(programId).orElseThrow();
 
-        // Deactivate the currently active curriculum for this program
-        curriculumVersionRepository.findByProgram_ProgramIdAndIsActiveTrue(programId)
-            .ifPresent(cur -> { cur.setIsActive(false); curriculumVersionRepository.save(cur); });
-
-        // Create new curriculum, mark as active
+        // New curriculum starts as an inactive draft — registrar activates it manually when ready
         long seq = curriculumVersionRepository.count() + 1;
         Curriculum newCur = Curriculum.builder()
             .curriculumId("CUR-" + String.format("%03d", seq))
             .program(program)
             .label(label)
-            .isActive(true)
+            .isActive(false)
             .build();
         curriculumVersionRepository.save(newCur);
 
@@ -171,6 +178,23 @@ class CurriculumController {
     public ResponseEntity<?> activateCurriculum(@PathVariable String id) {
         Curriculum target = curriculumVersionRepository.findByCurriculumId(id).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
+
+        // Option A: block if enrollment is currently open
+        boolean enrollmentOpen = semesterRepository.findByIsActiveTrue()
+            .map(s -> Boolean.TRUE.equals(s.getEnrollmentOpen()))
+            .orElse(false);
+        if (enrollmentOpen) {
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot switch the active curriculum while enrollment is open. Close enrollment first."));
+        }
+
+        // Option B: block if the target curriculum has no courses
+        long targetCourseCount = courseRepository.findByCurriculum_CurriculumIdAndIsActiveTrue(id).size();
+        if (targetCourseCount == 0) {
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot activate an empty curriculum. Add courses to it first."));
+        }
+
         curriculumVersionRepository.findByProgram_ProgramIdAndIsActiveTrue(target.getProgram().getProgramId())
             .ifPresent(cur -> { cur.setIsActive(false); curriculumVersionRepository.save(cur); });
         target.setIsActive(true);
@@ -283,9 +307,23 @@ class CurriculumController {
     // LAYER 2 → LAYER 1: Returns HTTP 204 No Content on success, or 404 if not found
     @DeleteMapping("/courses/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Void> deleteCourse(@PathVariable String id) {
+    public ResponseEntity<?> deleteCourse(@PathVariable String id) {
         Course existing = courseRepository.findByCourseId(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
+
+        boolean hasEnrollments = enrollmentSubjectRepository.existsByCourse_CourseId(id);
+        boolean hasGrades      = gradeRepository.existsByCourse_CourseId(id);
+        boolean hasSchedules   = scheduleRepository.existsByCourse_CourseId(id);
+        if (hasEnrollments || hasGrades || hasSchedules) {
+            List<String> affected = new java.util.ArrayList<>();
+            if (hasEnrollments) affected.add("student enrollments");
+            if (hasGrades)      affected.add("grade records");
+            if (hasSchedules)   affected.add("schedule entries");
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot delete — this course has existing " +
+                String.join(", ", affected) + ". Create a new curriculum version to remove courses."));
+        }
+
         prerequisiteRepository.deleteByCourse_CourseId(id);
         prerequisiteRepository.deleteByPrerequisiteCourse_CourseId(id);
         courseRepository.delete(existing);

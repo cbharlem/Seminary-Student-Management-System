@@ -477,7 +477,7 @@
         <option value="">Select section…</option>
       </select>
     </div>
-    <div class="card-body card-pad">
+    <div class="card-body card-pad" style="overflow-x:auto">
       <div class="sched-grid">
         <div></div>
         <div class="sched-header">Mon</div><div class="sched-header">Tue</div><div class="sched-header">Wed</div><div class="sched-header">Thu</div><div class="sched-header">Fri</div>
@@ -648,7 +648,7 @@
 <div id="page-my-schedule" class="page">
   <div id="student-enroll-notice-sched" class="student-enroll-notice" style="display:none"></div>
   <div class="page-header"><div><h2>My Schedule</h2><p id="my-sched-sub">Loading...</p></div></div>
-  <div class="card card-pad">
+  <div class="card card-pad" style="overflow-x:auto">
     <div class="sched-grid">
       <div></div>
       <div class="sched-header">Mon</div><div class="sched-header">Tue</div><div class="sched-header">Wed</div><div class="sched-header">Thu</div><div class="sched-header">Fri</div>
@@ -1223,13 +1223,8 @@
 <div class="modal-overlay" id="modal-schedule">
   <div class="modal" id="sch-modal">
     <div class="edit-mode-banner">✏️ Editing — unsaved changes will be lost if you cancel</div>
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-      <div>
-        <h3 id="sch-modal-title">Add Schedule</h3>
-        <p class="modal-sub">Conflicts will be flagged automatically</p>
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="closeSchedModal()" style="font-size:1rem;padding:4px 10px">✕</button>
-    </div>
+    <h3 id="sch-modal-title">Add Schedule</h3>
+    <p class="modal-sub">Conflicts will be flagged automatically</p>
     <input type="hidden" id="sch-id"/>
     <div class="conflict-alert" id="sched-conflict-alert"></div>
     <div class="modal-grid">
@@ -1237,9 +1232,9 @@
       <div class="field"><label for="sch-course">Course <span style="color:var(--danger)">*</span></label><select id="sch-course" required></select></div>
       <div class="field"><label for="sch-instructor">Instructor <span style="color:var(--danger)">*</span></label><select id="sch-instructor" required></select></div>
       <div class="field"><label for="sch-room">Room <span style="color:var(--danger)">*</span></label><select id="sch-room" required></select></div>
-      <div class="field"><label for="sch-day">Day of Week <span style="color:var(--danger)">*</span></label><select id="sch-day" required><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div>
       <div class="field"><label for="sch-start">Time Start <span style="color:var(--danger)">*</span></label><input id="sch-start" type="time" required/></div>
       <div class="field"><label for="sch-end">Time End <span style="color:var(--danger)">*</span></label><input id="sch-end" type="time" required/></div>
+      <div class="field full"><label for="sch-day">Day of Week <span style="color:var(--danger)">*</span></label><select id="sch-day" required><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeSchedModal()">Cancel</button>
