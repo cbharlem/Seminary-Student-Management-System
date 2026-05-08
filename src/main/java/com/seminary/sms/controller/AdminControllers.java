@@ -52,6 +52,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.transaction.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -253,10 +254,14 @@ class CurriculumController {
     // LAYER 2 → LAYER 1: Returns the saved Course JSON
     @PostMapping("/courses")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Course> addCourse(@RequestBody Course course) {
+    public ResponseEntity<?> addCourse(@RequestBody Course course) {
         course.setCourseId("CRS" + String.format("%03d", 1 + courseRepository.count()));
-        if (course.getProgram() != null && course.getProgram().getProgramId() != null)
-            programRepository.findByProgramId(course.getProgram().getProgramId()).ifPresent(course::setProgram);
+        if (course.getProgram() == null || course.getProgram().getProgramId() == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Program is required."));
+        Program resolvedProgram = programRepository.findByProgramId(course.getProgram().getProgramId()).orElse(null);
+        if (resolvedProgram == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Program not found."));
+        course.setProgram(resolvedProgram);
         if (course.getCurriculum() != null && course.getCurriculum().getCurriculumId() != null)
             curriculumVersionRepository.findByCurriculumId(course.getCurriculum().getCurriculumId())
                 .ifPresent(course::setCurriculum);
@@ -335,12 +340,20 @@ class CurriculumController {
     // LAYER 2 → LAYER 1: Returns the saved Prerequisite JSON
     @PostMapping("/prerequisites")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Prerequisite> addPrerequisite(@RequestBody Prerequisite prereq) {
+    public ResponseEntity<?> addPrerequisite(@RequestBody Prerequisite prereq) {
         prereq.setPrerequisiteId("PRE-" + System.currentTimeMillis());
-        if (prereq.getCourse() != null && prereq.getCourse().getCourseId() != null)
-            courseRepository.findByCourseId(prereq.getCourse().getCourseId()).ifPresent(prereq::setCourse);
-        if (prereq.getPrerequisiteCourse() != null && prereq.getPrerequisiteCourse().getCourseId() != null)
-            courseRepository.findByCourseId(prereq.getPrerequisiteCourse().getCourseId()).ifPresent(prereq::setPrerequisiteCourse);
+        if (prereq.getCourse() == null || prereq.getCourse().getCourseId() == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Course is required."));
+        Course resolvedCourse = courseRepository.findByCourseId(prereq.getCourse().getCourseId()).orElse(null);
+        if (resolvedCourse == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Course not found."));
+        prereq.setCourse(resolvedCourse);
+        if (prereq.getPrerequisiteCourse() == null || prereq.getPrerequisiteCourse().getCourseId() == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Prerequisite course is required."));
+        Course resolvedPrereq = courseRepository.findByCourseId(prereq.getPrerequisiteCourse().getCourseId()).orElse(null);
+        if (resolvedPrereq == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Prerequisite course not found."));
+        prereq.setPrerequisiteCourse(resolvedPrereq);
         return ResponseEntity.ok(prerequisiteRepository.save(prereq));
     }
 
@@ -394,10 +407,18 @@ class SectionController {
                 return ResponseEntity.badRequest().body(Map.of("error", "A section with that name already exists in this semester"));
         }
         section.setSectionId("SEC-" + String.format("%04d", 1001 + sectionRepository.count()));
-        if (section.getProgram() != null && section.getProgram().getProgramId() != null)
-            programRepository.findByProgramId(section.getProgram().getProgramId()).ifPresent(section::setProgram);
-        if (section.getSemester() != null && section.getSemester().getSemesterId() != null)
-            semesterRepository.findBySemesterId(section.getSemester().getSemesterId()).ifPresent(section::setSemester);
+        if (section.getProgram() == null || section.getProgram().getProgramId() == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Program is required."));
+        Program resolvedProg = programRepository.findByProgramId(section.getProgram().getProgramId()).orElse(null);
+        if (resolvedProg == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Program not found."));
+        section.setProgram(resolvedProg);
+        if (section.getSemester() == null || section.getSemester().getSemesterId() == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Semester is required."));
+        Semester resolvedSem = semesterRepository.findBySemesterId(section.getSemester().getSemesterId()).orElse(null);
+        if (resolvedSem == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Semester not found."));
+        section.setSemester(resolvedSem);
         return ResponseEntity.ok(sectionRepository.save(section));
     }
 
@@ -579,6 +600,8 @@ class AlumniController {
                 return ResponseEntity.ok(Map.of("eligible", true));
             }
             return ResponseEntity.ok(Map.of("eligible", false, "incomplete", incomplete));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -597,6 +620,8 @@ class AlumniController {
             Alumni alum = alumniService.graduateStudent(studentId, gradDate, honors);
             auditService.log("CREATE", "Alumni", "Graduated student " + studentId + (honors != null && !honors.isBlank() ? " with honors: " + honors : ""));
             return ResponseEntity.ok(alum);
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -624,6 +649,8 @@ class AlumniController {
         try {
             alumniService.unmarkAlumni(id);
             return ResponseEntity.ok(Map.of("message", "Alumni record removed and student reactivated."));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

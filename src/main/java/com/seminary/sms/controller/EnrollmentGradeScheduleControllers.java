@@ -38,6 +38,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.format.DateTimeParseException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -248,6 +249,8 @@ class EnrollmentController {
             Enrollment enrolled = enrollmentService.enroll(student, program, semester, section, yearLevel);
             auditService.log("CREATE", "Enrollment", "Enrolled student " + student.getStudentId() + " in semester " + semester.getSemesterId());
             return ResponseEntity.ok(Map.of("enrollment", enrolled, "isFirstEnrollment", false));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -324,6 +327,8 @@ class EnrollmentController {
             if (suggested > 10) suggested = 10;
 
             return ResponseEntity.ok(Map.of("suggestedYearLevel", suggested, "reason", reason));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -424,6 +429,8 @@ class EnrollmentController {
                     buildCourseItem(c, studentId, failedCourseIds, alreadyEnrolled, "makeup")));
 
             return ResponseEntity.ok(resultMap.values());
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -497,6 +504,8 @@ class EnrollmentController {
                 + (overrideCount > 0 ? " (" + overrideCount + " prerequisite override(s))" : ""));
 
             return ResponseEntity.ok(enrolled);
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -514,6 +523,8 @@ class EnrollmentController {
             semesterRepository.save(active);
             auditService.log("UPDATE", "Semester", "Enrollment closed for " + active.getSemesterLabel());
             return ResponseEntity.ok(Map.of("enrollmentOpen", false, "semesterLabel", active.getSemesterLabel()));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -529,6 +540,8 @@ class EnrollmentController {
             semesterRepository.save(active);
             auditService.log("UPDATE", "Semester", "Enrollment reopened for " + active.getSemesterLabel());
             return ResponseEntity.ok(Map.of("enrollmentOpen", true, "semesterLabel", active.getSemesterLabel()));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -595,6 +608,8 @@ class GradeController {
             Grade saved = gradeService.saveGrade(grade, user);
             auditService.log("CREATE", "Grade", "Created grade record ID: " + saved.getGradeId());
             return ResponseEntity.ok(saved);
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -634,6 +649,8 @@ class GradeController {
         } catch (IllegalArgumentException e) {
             // SECURITY (A08): Enum poisoning — return generic message not class path
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid grade status value."));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -680,8 +697,14 @@ class ScheduleController {
                 .orElseThrow(() -> new RuntimeException("Section not found")));
             schedule.setCourse(courseRepository.findByCourseId(body.get("courseId"))
                 .orElseThrow(() -> new RuntimeException("Course not found")));
-            instructorRepository.findByInstructorId(body.get("instructorId")).ifPresent(schedule::setInstructor);
-            roomRepository.findByRoomId(body.get("roomId")).ifPresent(schedule::setRoom);
+            if (body.get("instructorId") == null || body.get("instructorId").isBlank())
+                throw new RuntimeException("Instructor is required.");
+            schedule.setInstructor(instructorRepository.findByInstructorId(body.get("instructorId"))
+                .orElseThrow(() -> new RuntimeException("Instructor not found.")));
+            if (body.get("roomId") == null || body.get("roomId").isBlank())
+                throw new RuntimeException("Room is required.");
+            schedule.setRoom(roomRepository.findByRoomId(body.get("roomId"))
+                .orElseThrow(() -> new RuntimeException("Room not found.")));
             // SECURITY (A08): Enum poisoning catch for DayOfWeek handled below
             if (body.get("dayOfWeek") == null)
                 throw new RuntimeException("Day of week is required.");
@@ -701,6 +724,8 @@ class ScheduleController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid day of week value."));
         } catch (DateTimeParseException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid time format. Use HH:mm (e.g. 08:00)."));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -722,8 +747,14 @@ class ScheduleController {
                 .orElseThrow(() -> new RuntimeException("Section not found")));
             schedule.setCourse(courseRepository.findByCourseId(body.get("courseId"))
                 .orElseThrow(() -> new RuntimeException("Course not found")));
-            instructorRepository.findByInstructorId(body.get("instructorId")).ifPresent(schedule::setInstructor);
-            roomRepository.findByRoomId(body.get("roomId")).ifPresent(schedule::setRoom);
+            if (body.get("instructorId") == null || body.get("instructorId").isBlank())
+                throw new RuntimeException("Instructor is required.");
+            schedule.setInstructor(instructorRepository.findByInstructorId(body.get("instructorId"))
+                .orElseThrow(() -> new RuntimeException("Instructor not found.")));
+            if (body.get("roomId") == null || body.get("roomId").isBlank())
+                throw new RuntimeException("Room is required.");
+            schedule.setRoom(roomRepository.findByRoomId(body.get("roomId"))
+                .orElseThrow(() -> new RuntimeException("Room not found.")));
             if (body.get("dayOfWeek") == null)
                 throw new RuntimeException("Day of week is required.");
             schedule.setDayOfWeek(Schedule.DayOfWeek.valueOf(body.get("dayOfWeek")));
@@ -740,6 +771,8 @@ class ScheduleController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid day of week value."));
         } catch (DateTimeParseException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid time format. Use HH:mm (e.g. 08:00)."));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {

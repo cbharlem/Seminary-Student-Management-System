@@ -30,76 +30,135 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css"/>
 <style>
-  body { display:flex; height:100vh; overflow:hidden; }
+  body { display:flex; height:100vh; overflow:hidden; background:#f0f4ff; }
+
+  /* ── LEFT PANEL ── */
   .login-left {
-    width:37%; background:var(--navy);
-    display:flex; flex-direction:column; align-items:flex-start;
-    padding:40px 48px; position:relative; overflow:hidden;
+    width:44%;
+    background-image: url('/images/seminary.jpg');
+    background-size: cover;
+    background-position: center top;
+    display:flex; flex-direction:column;
+    align-items:flex-start;
+    padding:48px 52px;
+    position:relative; overflow:hidden;
   }
+  /* Blue overlay — lets the photo show through with the navy brand color */
   .login-left::before {
-    content:''; position:absolute; bottom:-80px; right:-80px;
-    width:320px; height:320px; border-radius:50%;
-    background:rgba(255,255,255,0.08);
+    content:''; position:absolute; inset:0;
+    background: linear-gradient(
+      160deg,
+      rgba(10,22,80,0.80) 0%,
+      rgba(6,13,55,0.90) 100%
+    );
+    z-index:0;
   }
+  /* Subtle bottom-edge fade to deepen the panel */
   .login-left::after {
-    content:''; position:absolute; top:-60px; left:-60px;
-    width:240px; height:240px; border-radius:50%;
-    background:rgba(255,255,255,0.06);
+    content:''; position:absolute; bottom:0; left:0; right:0; height:160px;
+    background: linear-gradient(to top, rgba(4,9,40,0.55) 0%, transparent 100%);
+    z-index:0;
   }
+
   .login-logo {
-    width:64px; height:64px; border-radius:50%;
+    width:72px; height:72px; border-radius:50%;
     background:white;
     display:flex; align-items:center; justify-content:center;
     margin-bottom:auto; z-index:1;
-    padding:4px;
+    padding:5px;
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.15), 0 8px 24px rgba(0,0,0,0.35);
   }
-  .login-logo img { width:56px; height:56px; object-fit:contain; }
-  .login-brand { margin-bottom:48px; z-index:1; }
+  .login-logo img { width:62px; height:62px; object-fit:contain; }
+
+  .login-brand { margin-bottom:52px; z-index:1; }
   .login-brand h1 {
     font-family:'Plus Jakarta Sans',sans-serif;
-    font-size:2.6rem; color:white; line-height:1.15;
+    font-size:2.1rem; font-weight:700; color:white; line-height:1.2;
+    letter-spacing:-0.01em;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.4);
   }
-  .login-brand p { color:rgba(255,255,255,0.55); font-size:0.9rem; margin-top:10px; }
+  .login-brand p {
+    color:rgba(255,255,255,0.65);
+    font-size:0.88rem; font-weight:400;
+    margin-top:10px; letter-spacing:0.04em; text-transform:uppercase;
+  }
+
+  /* ── RIGHT PANEL ── */
   .login-right {
     flex:1; background:white;
     display:flex; flex-direction:column;
     align-items:center; justify-content:center;
-    padding:60px 80px;
-    box-shadow:-4px 0 24px rgba(13,27,94,0.08);
+    padding:60px 72px;
     position:relative;
+    box-shadow:-6px 0 32px rgba(10,22,80,0.12);
   }
-  /* Option C – footer */
-  .login-footer {
-    position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
-    font-size:0.72rem; color:var(--gray-400); white-space:nowrap;
+
+  .login-right-inner {
+    width:100%; max-width:380px;
+    display:flex; flex-direction:column; align-items:stretch;
   }
+
   .login-right h2 {
     font-family:'Plus Jakarta Sans',sans-serif;
-    font-size:2rem; color:var(--gray-800);
+    font-size:1.85rem; font-weight:700; color:var(--gray-800);
+    letter-spacing:-0.02em; line-height:1.2;
   }
-  .login-sub { color:var(--gray-600); font-size:0.95rem; margin-top:6px; margin-bottom:40px; }
-  .form-group { width:100%; max-width:400px; margin-bottom:20px; }
-  .form-group label { display:block; font-size:0.85rem; font-weight:500; color:var(--gray-600); margin-bottom:8px; }
+  .login-sub {
+    color:var(--gray-500); font-size:0.9rem;
+    margin-top:6px; margin-bottom:36px;
+  }
+
+
+  .form-group { width:100%; margin-bottom:18px; }
+  .form-group label {
+    display:block; font-size:0.8rem; font-weight:600;
+    color:var(--gray-600); margin-bottom:7px; letter-spacing:0.02em;
+    text-transform:uppercase;
+  }
   .form-group input {
-    width:100%; padding:12px 16px;
-    border:1.5px solid var(--gray-200); border-radius:8px;
+    width:100%; padding:13px 16px;
+    border:1.5px solid var(--gray-200); border-radius:10px;
     font-size:0.95rem; font-family:'Plus Jakarta Sans',sans-serif;
-    color:var(--gray-800); outline:none; transition:border-color .2s;
+    color:var(--gray-800); outline:none;
+    transition:border-color .2s, box-shadow .2s;
+    background:#fafbff;
+    box-sizing:border-box;
   }
-  .form-group input:focus { border-color:var(--accent); }
+  .form-group input:focus {
+    border-color:var(--accent);
+    box-shadow: 0 0 0 3px rgba(46,75,189,0.10);
+    background:white;
+  }
+  .form-group input::placeholder { color:var(--gray-400); }
+
   .btn-login {
-    width:100%; max-width:400px; padding:14px;
-    background:var(--navy); color:white; border:none;
-    border-radius:8px; font-size:1rem; font-weight:600;
+    width:100%; padding:14px;
+    background: linear-gradient(135deg, var(--navy) 0%, var(--accent) 100%);
+    color:white; border:none; border-radius:10px;
+    font-size:0.95rem; font-weight:600;
     cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif;
-    transition:background .2s; margin-top:8px;
+    transition:opacity .2s, transform .15s, box-shadow .2s;
+    margin-top:10px;
+    letter-spacing:0.02em;
+    box-shadow: 0 4px 16px rgba(13,27,94,0.25);
   }
-  .btn-login:hover { background:var(--navy-mid); }
+  .btn-login:hover { opacity:.92; transform:translateY(-1px); box-shadow:0 6px 20px rgba(13,27,94,0.30); }
+  .btn-login:active { transform:translateY(0); }
+  .btn-login:disabled {
+    background:var(--gray-300,#d1d5db); color:var(--gray-500,#6b7280);
+    cursor:not-allowed; box-shadow:none; transform:none; opacity:1;
+  }
+
+  /* Alert boxes */
   .login-error {
-    width:100%; max-width:400px; margin-bottom:16px;
-    padding:10px 14px; border-radius:8px;
+    width:100%; margin-bottom:16px;
+    padding:11px 14px; border-radius:9px;
     background:var(--danger-bg); color:var(--danger);
     font-size:0.85rem; display:none;
+    border-left:3px solid var(--danger);
+  }
+  .login-error.success {
+    border-left-color: var(--success, #2d7d46);
   }
   .login-error.show { display:block; }
   .attempt-counter {
@@ -107,32 +166,28 @@
     border-top:1px solid rgba(0,0,0,0.08);
     font-size:0.8rem; font-weight:500;
   }
-  .attempt-counter--last {
-    font-weight:700; letter-spacing:0.01em;
-  }
+  .attempt-counter--last { font-weight:700; letter-spacing:0.01em; }
   .login-blocked {
-    width:100%; max-width:400px; margin-bottom:16px;
-    padding:14px 16px; border-radius:8px;
+    width:100%; margin-bottom:16px;
+    padding:13px 14px; border-radius:9px;
     background:#fff7ed; color:#92400e;
-    border:1.5px solid #fdba74;
+    border-left:3px solid #f97316;
     font-size:0.875rem; display:none; line-height:1.6;
   }
   .login-blocked.show { display:block; }
   .login-blocked strong { display:block; font-size:0.95rem; margin-bottom:4px; }
   .login-blocked .countdown { font-weight:600; font-variant-numeric:tabular-nums; }
   .login-disabled {
-    width:100%; max-width:400px; margin-bottom:16px;
-    padding:14px 16px; border-radius:8px;
+    width:100%; margin-bottom:16px;
+    padding:13px 14px; border-radius:9px;
     background:#fef2f2; color:#991b1b;
-    border:1.5px solid #fca5a5;
+    border-left:3px solid #ef4444;
     font-size:0.875rem; display:none; line-height:1.6;
   }
   .login-disabled.show { display:block; }
   .login-disabled strong { display:block; font-size:0.95rem; margin-bottom:4px; }
-  .btn-login:disabled {
-    background:var(--gray-300,#d1d5db); color:var(--gray-500,#6b7280);
-    cursor:not-allowed;
-  }
+
+  /* Password toggle */
   .password-wrapper { position:relative; }
   .password-wrapper input { padding-right:44px; }
   .toggle-password {
@@ -141,71 +196,98 @@
     color:var(--gray-400); font-size:1rem; line-height:1;
   }
   .toggle-password:hover { color:var(--gray-600); }
+
+  /* Links row */
+  .login-links-row {
+    display:flex; justify-content:flex-end; margin-top:6px;
+  }
+  .login-links-row a {
+    font-size:0.82rem; color:var(--accent);
+    text-decoration:underline; text-underline-offset:3px;
+    font-weight:500; border-radius:4px; outline-offset:3px;
+  }
+
+  .login-public-links {
+    margin-top:28px; text-align:center;
+    display:flex; flex-direction:column; gap:8px;
+    padding-top:24px;
+    border-top:1px solid var(--gray-100);
+  }
+  .login-public-links a {
+    font-size:0.82rem; color:var(--accent);
+    text-decoration:underline; text-underline-offset:3px;
+    font-weight:500; border-radius:4px; outline-offset:3px;
+  }
+  .login-public-links a.secondary {
+    color:var(--gray-500); font-weight:400;
+  }
+
+  .login-footer {
+    position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+    font-size:0.7rem; color:var(--gray-300); white-space:nowrap;
+    letter-spacing:0.02em;
+  }
+
   @media (max-width:768px) { .login-left { display:none; } }
 </style>
 </head>
 <body>
 <div class="login-left">
   <div class="login-logo">
-    <img src="/images/seminaryLogo.png" alt="Seminary Logo"/>
+    <img src="/images/seminaryLogo.png" alt="St. Francis De Sales Seminary Logo"/>
   </div>
   <div class="login-brand">
-    <h1>Student<br>Management<br>System</h1>
-    <p>St. Francis De Sales Major Seminary</p>
+    <h1>St. Francis De Sales<br>Major Seminary</h1>
+    <p>Student Management System</p>
   </div>
 </div>
 
 <div class="login-right">
-  <h2>Welcome Back!</h2>
-  <p class="login-sub">Sign in to your account</p>
-  <div class="login-error" id="login-error" role="alert" aria-live="polite">Invalid username or password. Please try again.</div>
-  <div class="login-disabled" id="login-disabled" role="alert" aria-live="polite">
-    <strong>Account Disabled</strong>
-    Your account has been disabled. Please contact the administrator for assistance.
-  </div>
-  <div class="login-blocked" id="login-blocked" role="alert" aria-live="polite">
-    <strong>Too many failed attempts</strong>
-    Your account has been temporarily locked for security reasons.
-    Please try again in <span class="countdown" id="countdown">15:00</span>.
-  </div>
-  <form id="login-form" method="POST" action="/login" style="width:100%;display:contents">
-  <div class="form-group">
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" placeholder="Enter Username" autocomplete="username"/>
-  </div>
-  <div class="form-group">
-    <label for="password">Password</label>
-    <div class="password-wrapper">
-      <input type="password" id="password" name="password" placeholder="Enter Password" autocomplete="current-password"/>
-      <button type="button" class="toggle-password" onclick="togglePassword()" title="Show/hide password">
-        <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        <svg id="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-      </button>
+  <div class="login-right-inner">
+    <h2>Welcome Back</h2>
+    <p class="login-sub">Sign in to your account to continue.</p>
+
+    <div class="login-error" id="login-error" role="alert" aria-live="polite">Invalid username or password. Please try again.</div>
+    <div class="login-disabled" id="login-disabled" role="alert" aria-live="polite">
+      <strong>Account Disabled</strong>
+      Your account has been disabled. Please contact the administrator for assistance.
+    </div>
+    <div class="login-blocked" id="login-blocked" role="alert" aria-live="polite">
+      <strong>Too many failed attempts</strong>
+      Your account has been temporarily locked for security reasons.
+      Please try again in <span class="countdown" id="countdown">15:00</span>.
+    </div>
+
+    <form id="login-form" method="POST" action="/login">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="Enter your username" autocomplete="username"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password"/>
+          <button type="button" class="toggle-password" onclick="togglePassword()" title="Show/hide password">
+            <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg id="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="login-links-row">
+        <a href="/forgot-password.html">Forgot your password?</a>
+      </div>
+
+      <button type="submit" class="btn-login" id="btn-login-submit">Sign In</button>
+    </form>
+
+    <!-- WCAG 1.4.1: underline distinguishes links without relying on color alone -->
+    <div class="login-public-links">
+      <a href="/check-status.html">Applied online? Check your application status</a>
+      <a href="/apply.html" class="secondary">New applicant? Apply online here</a>
     </div>
   </div>
-  <button type="submit" class="btn-login" id="btn-login-submit">Sign In</button>
-  </form>
 
-  <div style="text-align:right;width:100%;max-width:400px;margin-top:8px">
-    <a href="/forgot-password.html" style="font-size:0.82rem;color:var(--accent);text-decoration:underline;text-underline-offset:3px;font-weight:500;border-radius:4px;outline-offset:3px">
-      Forgot your password?
-    </a>
-  </div>
-
-  <!-- Public admission links -->
-  <!-- WCAG 1.4.1: underline distinguishes links without relying on color alone -->
-  <!-- WCAG 1.4.3: gray-600 (#4a5270) on white gives ~7:1, passing AA -->
-  <!-- WCAG 2.4.7: focus-visible outline added via inline onFocus/style workaround below -->
-  <div style="margin-top:24px;text-align:center;display:flex;flex-direction:column;gap:8px;width:100%;max-width:400px">
-    <a href="/check-status.html" style="font-size:0.82rem;color:var(--accent);text-decoration:underline;text-underline-offset:3px;font-weight:500;border-radius:4px;outline-offset:3px">
-      Applied online? Check your application status
-    </a>
-    <a href="/apply.html" style="font-size:0.82rem;color:var(--gray-600);text-decoration:underline;text-underline-offset:3px;border-radius:4px;outline-offset:3px">
-      New applicant? Apply online here
-    </a>
-  </div>
-
-  <!-- Option C: footer -->
   <div class="login-footer">&copy; 2026 St. Francis de Sales Major Seminary &nbsp;&bull;&nbsp; Student Management System</div>
 </div>
 
@@ -277,7 +359,7 @@
     errBox.style.background = 'var(--success-bg,#e6f4ec)';
     errBox.style.color = 'var(--success,#2d7d46)';
     errBox.textContent = 'You have been logged out successfully.';
-    errBox.classList.add('show');
+    errBox.classList.add('show', 'success');
   }
 
   if (params.get('blocked')) {

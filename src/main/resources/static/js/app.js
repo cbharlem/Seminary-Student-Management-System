@@ -157,7 +157,7 @@ async function init() {
     const sem = await api('/api/school-years/semesters/active');
     if (sem) {
       SMS.activeSemester = sem;
-      document.getElementById('hdr-sy').textContent = sem.semesterLabel;
+      document.getElementById('hdr-sy-text').textContent = sem.semesterLabel;
       document.getElementById('dash-sem') && (document.getElementById('dash-sem').textContent = sem.semesterLabel);
       document.getElementById('enroll-sem-label') && (document.getElementById('enroll-sem-label').textContent = sem.semesterLabel);
       document.getElementById('my-sched-sub') && (document.getElementById('my-sched-sub').textContent = sem.semesterLabel);
@@ -2494,7 +2494,7 @@ async function activateSem(id) {
     // refresh active sem info
     const sem = await api('/api/school-years/semesters/active');
     SMS.activeSemester = sem;
-    document.getElementById('hdr-sy').textContent = sem.semesterLabel;
+    document.getElementById('hdr-sy-text').textContent = sem.semesterLabel;
     // reset enrollment filter so next visit defaults to the new active semester
     const enrollFilter = document.getElementById('enroll-filter-sem');
     if (enrollFilter) { enrollFilter.innerHTML = ''; }

@@ -23,6 +23,7 @@ package com.seminary.sms.config;
 //                              Prevents stack traces from ever reaching the browser.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -47,6 +48,13 @@ public class GlobalExceptionHandler {
         // SECURITY (A08): Never expose e.getMessage() for IllegalArgumentException —
         // Enum.valueOf() messages expose full class paths (e.g. com.seminary.sms.entity...)
         return ResponseEntity.badRequest().body(Map.of("error", "Invalid request parameter."));
+    }
+
+    // SECURITY (A05): DB constraint errors contain table/column names — never expose them.
+    // This catches any DataIntegrityViolationException that escapes a controller's own catch block.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrity(DataIntegrityViolationException e) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all required fields."));
     }
 
     @ExceptionHandler(Exception.class)

@@ -19,14 +19,20 @@ import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
 import org.springframework.core.io.ClassPathResource;
 import com.seminary.sms.entity.*;
+import com.seminary.sms.repository.ReportRepository;
 import com.seminary.sms.repository.SemesterRepository;
+import com.seminary.sms.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +42,8 @@ public class PdfReportService {
     private final GradeService gradeService;
     private final EnrollmentService enrollmentService;
     private final SemesterRepository semesterRepository;
+    private final ReportRepository reportRepository;
+    private final UserRepository userRepository;
 
     private static final DeviceRgb NAVY      = new DeviceRgb(13, 43, 99);
     private static final DeviceRgb LIGHT_BG  = new DeviceRgb(235, 240, 255);
@@ -44,6 +52,7 @@ public class PdfReportService {
 
     // ── GRADE CARD ───────────────────────────────────────────────────────────
 
+    @Transactional
     public byte[] generateGradeCard(String studentId, String semesterId) {
         Student student = studentService.getById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found: " + studentId));
@@ -80,11 +89,14 @@ public class PdfReportService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate Grade Card PDF", e);
         }
-        return out.toByteArray();
+        byte[] pdf = out.toByteArray();
+        logReport(Report.ReportType.GradeCard, student, semester);
+        return pdf;
     }
 
     // ── TRANSCRIPT OF RECORDS ─────────────────────────────────────────────────
 
+    @Transactional
     public byte[] generateTranscript(String studentId) {
         Student student = studentService.getById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found: " + studentId));
@@ -154,11 +166,14 @@ public class PdfReportService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate Transcript PDF", e);
         }
-        return out.toByteArray();
+        byte[] pdf = out.toByteArray();
+        logReport(Report.ReportType.TranscriptOfRecords, student, null);
+        return pdf;
     }
 
     // ── CHED REPORT ───────────────────────────────────────────────────────────
 
+    @Transactional
     public byte[] generateCHEDReport(String semesterId) {
         Semester semester = semesterRepository.findBySemesterId(semesterId)
                 .orElseThrow(() -> new RuntimeException("Semester not found: " + semesterId));
@@ -202,10 +217,31 @@ public class PdfReportService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate CHED Report PDF", e);
         }
-        return out.toByteArray();
+        byte[] pdf = out.toByteArray();
+        logReport(Report.ReportType.CHEDReport, null, semester);
+        return pdf;
     }
 
     // ── HELPERS ───────────────────────────────────────────────────────────────
+
+    private void logReport(Report.ReportType type, Student student, Semester semester) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User generatedBy = (auth != null)
+                ? userRepository.findByUsername(auth.getName()).orElse(null)
+                : null;
+        if (generatedBy == null) return;
+
+        String reportId = UUID.randomUUID().toString().replace("-", "").substring(0, 30);
+        Report report = Report.builder()
+                .reportId(reportId)
+                .reportType(type)
+                .student(student)
+                .semester(semester)
+                .generatedBy(generatedBy)
+                .exportFormat(Report.ExportFormat.PDF)
+                .build();
+        reportRepository.save(report);
+    }
 
     private Document buildDocument(ByteArrayOutputStream out) throws Exception {
         PdfWriter  writer = new PdfWriter(out);

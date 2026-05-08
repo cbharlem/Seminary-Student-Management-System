@@ -45,21 +45,49 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--gray-50);
   padding: 0 24px; gap: 16px;
   position: sticky; top: 0; z-index: 100;
 }
-.logo-mark {
-  width: 42px; height: 42px;
-  background: white; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
+
+/* Brand zone */
+.hdr-brand {
+  display: flex; align-items: center; gap: 14px;
 }
-.sys-title { font-weight: 600; color: var(--navy); font-size: 0.95rem; }
+.hdr-logo {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: white; border: 1.5px solid var(--gray-200);
+  box-shadow: 0 1px 4px rgba(13,27,94,0.12);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; overflow: hidden;
+}
+.hdr-logo img { width: 34px; height: 34px; object-fit: contain; }
+.hdr-divider {
+  width: 1px; height: 32px;
+  background: var(--gray-200); flex-shrink: 0;
+}
+.hdr-titles {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.hdr-school {
+  font-size: 0.72rem; font-weight: 600;
+  color: var(--gray-400); letter-spacing: 0.02em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.hdr-system {
+  font-size: 0.92rem; font-weight: 700;
+  color: var(--navy); white-space: nowrap;
+}
+
+/* User section */
+.hdr-user-info { display: flex; flex-direction: column; gap: 1px; }
 .spacer { flex: 1; }
 .hdr-right { display: flex; align-items: center; gap: 14px; }
 .school-year-badge {
   font-size: 0.8rem; color: var(--navy);
   background: var(--gray-100); padding: 6px 12px; border-radius: 12px;
   font-weight: 500; border: 1px solid var(--gray-200);
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
 }
 .user-menu { position: relative; cursor: pointer; }
-.user-badge { display: flex; align-items: center; gap: 10px; }
+.user-badge { display: flex; align-items: center; gap: 9px; cursor: pointer; }
 .user-menu-caret { font-size: 0.75rem; color: var(--gray-400); margin-left: -4px; }
 .user-dropdown {
   display: none; position: absolute; right: 0; top: calc(100% + 10px);
@@ -194,7 +222,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--gray-50);
 .stat-card {
   background: white; border-radius: 12px;
   padding: 20px 24px; border: 1px solid var(--gray-100);
+  box-shadow: 0 2px 8px rgba(13,27,94,0.06);
+  border-top: 3px solid var(--navy);
 }
+.stat-card:nth-child(2) { border-top-color: var(--accent); }
+.stat-card:nth-child(3) { border-top-color: var(--success); }
+.stat-card:nth-child(4) { border-top-color: var(--warn); }
 .stat-icon {
   width: 38px; height: 38px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
@@ -209,6 +242,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--gray-50);
   background: white; border-radius: 12px;
   border: 1px solid var(--gray-100); overflow: hidden;
   margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(13,27,94,0.06);
 }
 .card-header {
   padding: 18px 24px; border-bottom: 1px solid var(--gray-100);
@@ -306,7 +340,10 @@ thead th.sortable.sort-desc::after {
   cursor: pointer; border: none;
   transition: all .15s; font-family: 'Plus Jakarta Sans', sans-serif;
   display: inline-flex; align-items: center; gap: 6px;
+  box-shadow: 0 1px 4px rgba(13,27,94,0.10);
 }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,27,94,0.15); }
+.btn:active { transform: translateY(0); box-shadow: 0 1px 4px rgba(13,27,94,0.10); }
 .btn-primary { background: var(--navy); color: white; }
 .btn-primary:hover { background: var(--navy-mid); }
 .btn-outline {
@@ -373,6 +410,7 @@ body.admin-view .registrar-only { display: none !important; }
   width: 620px; max-width: 95vw;
   max-height: 90vh; overflow-y: auto; overflow-x: hidden;
   padding: 32px;
+  box-shadow: 0 8px 40px rgba(13,27,94,0.18);
 }
 .modal h3 {
   font-family: 'Plus Jakarta Sans', sans-serif;
@@ -481,6 +519,7 @@ body.admin-view .registrar-only { display: none !important; }
   background: white; border-radius: 12px;
   border: 1px solid var(--gray-100); padding: 24px;
   height: fit-content;
+  box-shadow: 0 2px 8px rgba(13,27,94,0.06);
 }
 .detail-avatar {
   width: 72px; height: 72px; border-radius: 50%;
@@ -542,8 +581,9 @@ body.admin-view .registrar-only { display: none !important; }
   background: white; border: 1px solid var(--gray-100);
   border-radius: 12px; padding: 24px;
   cursor: pointer; transition: all .2s;
+  box-shadow: 0 2px 8px rgba(13,27,94,0.06);
 }
-.report-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(13,27,94,.08); }
+.report-card:hover { border-color: var(--accent); box-shadow: 0 6px 20px rgba(13,27,94,.12); transform: translateY(-2px); }
 .rc-icon {
   width: 44px; height: 44px; border-radius: 10px;
   background: var(--info-bg); display: flex;

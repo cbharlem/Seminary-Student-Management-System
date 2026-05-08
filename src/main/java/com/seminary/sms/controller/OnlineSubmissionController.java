@@ -189,7 +189,7 @@ class PublicSubmissionController {
             return ResponseEntity.ok(Map.of("submissionId", saved.getSubmissionId()));
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Submission failed: " + e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Submission failed. Please check all fields and try again."));
         }
     }
 
