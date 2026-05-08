@@ -275,7 +275,7 @@ CREATE TABLE `tbldocuments` (
   `fldIndex` int(11) NOT NULL,
   `fldDocumentID` varchar(30) NOT NULL,
   `fldStudentIndex` int(11) NOT NULL COMMENT 'FK to tblstudents.fldIndex',
-  `fldDocumentType` enum('BirthCertificate','Form137','Diploma','BaptismalRecord','ConfirmationRecord','MarriageContractOfParents','MedicalRecord','DentalRecord','ParishPriestRecommendation','Other') NOT NULL,
+  `fldDocumentType` enum('BirthCertificate','Form137','Diploma','BaptismalRecord','ConfirmationRecord','MarriageContractOfParents','MedicalRecord','DentalRecord','ParishPriestRecommendation','GoodMoral','Other') NOT NULL,
   `fldFileName` varchar(255) NOT NULL,
   `fldFilePath` varchar(500) NOT NULL,
   `fldUploadedAt` datetime NOT NULL DEFAULT current_timestamp(),
