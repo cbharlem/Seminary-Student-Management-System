@@ -205,6 +205,12 @@ function fmtDate(str) {
   return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function fmtDateTime(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+}
+
 // ── Populate Select ───────────────────────────────────────────
 function populateSelect(selectId, items, valueKey, labelFn, emptyLabel) {
   const sel = document.getElementById(selectId);

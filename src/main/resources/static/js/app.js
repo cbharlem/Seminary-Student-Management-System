@@ -1242,7 +1242,7 @@ async function loadAuditLog(page) {
     tbody.innerHTML = (data.items || []).map(e => {
       const color = actionColors[e.action] || '#374151';
       return `<tr>
-        <td style="white-space:nowrap;font-size:.8rem">${fmtDate(e.timestamp)}</td>
+        <td style="white-space:nowrap;font-size:.8rem">${fmtDateTime(e.timestamp)}</td>
         <td>${escHtml(e.performedBy)}</td>
         <td><span class="badge">${escHtml(e.role)}</span></td>
         <td>${typeBadge(e.logType)}</td>
