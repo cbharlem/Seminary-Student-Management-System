@@ -1960,8 +1960,9 @@ function filterEnrSections(panel) {
   selectEl.innerHTML = '<option value="">No section</option>';
   filtered.forEach(s => {
     const opt = document.createElement('option');
+    const sy = s.semester?.schoolYear?.yearLabel;
     opt.value = s.sectionId;
-    opt.textContent = s.sectionName;
+    opt.textContent = s.sectionName + (sy ? ` (SY ${sy})` : '');
     selectEl.appendChild(opt);
   });
 }
