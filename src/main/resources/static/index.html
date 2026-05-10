@@ -492,15 +492,24 @@
         <option value="">Select section…</option>
       </select>
     </div>
-    <div class="card-body card-pad" style="overflow-x:auto">
-      <div class="sched-grid">
-        <div></div>
-        <div class="sched-header">Mon</div><div class="sched-header">Tue</div><div class="sched-header">Wed</div><div class="sched-header">Thu</div><div class="sched-header">Fri</div>
-        <div class="sched-time">7:00</div><div class="sched-cell" id="gc-mon-7"></div><div class="sched-cell" id="gc-tue-7"></div><div class="sched-cell" id="gc-wed-7"></div><div class="sched-cell" id="gc-thu-7"></div><div class="sched-cell" id="gc-fri-7"></div>
-        <div class="sched-time">9:00</div><div class="sched-cell" id="gc-mon-9"></div><div class="sched-cell" id="gc-tue-9"></div><div class="sched-cell" id="gc-wed-9"></div><div class="sched-cell" id="gc-thu-9"></div><div class="sched-cell" id="gc-fri-9"></div>
-        <div class="sched-time">11:00</div><div class="sched-cell" id="gc-mon-11"></div><div class="sched-cell" id="gc-tue-11"></div><div class="sched-cell" id="gc-wed-11"></div><div class="sched-cell" id="gc-thu-11"></div><div class="sched-cell" id="gc-fri-11"></div>
-        <div class="sched-time">1:00</div><div class="sched-cell" id="gc-mon-13"></div><div class="sched-cell" id="gc-tue-13"></div><div class="sched-cell" id="gc-wed-13"></div><div class="sched-cell" id="gc-thu-13"></div><div class="sched-cell" id="gc-fri-13"></div>
-        <div class="sched-time">3:00</div><div class="sched-cell" id="gc-mon-15"></div><div class="sched-cell" id="gc-tue-15"></div><div class="sched-cell" id="gc-wed-15"></div><div class="sched-cell" id="gc-thu-15"></div><div class="sched-cell" id="gc-fri-15"></div>
+    <div class="card-body card-pad">
+      <div class="sched-cal-wrap">
+        <div class="sched-cal-hdr">
+          <div class="sched-cal-gutter-hdr"></div>
+          <div class="sched-cal-day-hdr">Mon</div>
+          <div class="sched-cal-day-hdr">Tue</div>
+          <div class="sched-cal-day-hdr">Wed</div>
+          <div class="sched-cal-day-hdr">Thu</div>
+          <div class="sched-cal-day-hdr">Fri</div>
+        </div>
+        <div class="sched-cal-body">
+          <div class="sched-cal-gutter" id="gc-gutter"></div>
+          <div class="sched-cal-col" id="gc-col-mon"></div>
+          <div class="sched-cal-col" id="gc-col-tue"></div>
+          <div class="sched-cal-col" id="gc-col-wed"></div>
+          <div class="sched-cal-col" id="gc-col-thu"></div>
+          <div class="sched-cal-col" id="gc-col-fri"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -663,14 +672,24 @@
 <div id="page-my-schedule" class="page">
   <div id="student-enroll-notice-sched" class="student-enroll-notice" style="display:none"></div>
   <div class="page-header"><div><h2>My Schedule</h2><p id="my-sched-sub">Loading...</p></div></div>
-  <div class="card card-pad" style="overflow-x:auto">
-    <div class="sched-grid">
-      <div></div>
-      <div class="sched-header">Mon</div><div class="sched-header">Tue</div><div class="sched-header">Wed</div><div class="sched-header">Thu</div><div class="sched-header">Fri</div>
-      <div class="sched-time">7:00</div><div class="sched-cell" id="ms-mon-7"></div><div class="sched-cell" id="ms-tue-7"></div><div class="sched-cell" id="ms-wed-7"></div><div class="sched-cell" id="ms-thu-7"></div><div class="sched-cell" id="ms-fri-7"></div>
-      <div class="sched-time">9:00</div><div class="sched-cell" id="ms-mon-9"></div><div class="sched-cell" id="ms-tue-9"></div><div class="sched-cell" id="ms-wed-9"></div><div class="sched-cell" id="ms-thu-9"></div><div class="sched-cell" id="ms-fri-9"></div>
-      <div class="sched-time">11:00</div><div class="sched-cell" id="ms-mon-11"></div><div class="sched-cell" id="ms-tue-11"></div><div class="sched-cell" id="ms-wed-11"></div><div class="sched-cell" id="ms-thu-11"></div><div class="sched-cell" id="ms-fri-11"></div>
-      <div class="sched-time">1:00</div><div class="sched-cell" id="ms-mon-13"></div><div class="sched-cell" id="ms-tue-13"></div><div class="sched-cell" id="ms-wed-13"></div><div class="sched-cell" id="ms-thu-13"></div><div class="sched-cell" id="ms-fri-13"></div>
+  <div class="card card-pad">
+    <div class="sched-cal-wrap">
+      <div class="sched-cal-hdr">
+        <div class="sched-cal-gutter-hdr"></div>
+        <div class="sched-cal-day-hdr">Mon</div>
+        <div class="sched-cal-day-hdr">Tue</div>
+        <div class="sched-cal-day-hdr">Wed</div>
+        <div class="sched-cal-day-hdr">Thu</div>
+        <div class="sched-cal-day-hdr">Fri</div>
+      </div>
+      <div class="sched-cal-body">
+        <div class="sched-cal-gutter" id="ms-gutter"></div>
+        <div class="sched-cal-col" id="ms-col-mon"></div>
+        <div class="sched-cal-col" id="ms-col-tue"></div>
+        <div class="sched-cal-col" id="ms-col-wed"></div>
+        <div class="sched-cal-col" id="ms-col-thu"></div>
+        <div class="sched-cal-col" id="ms-col-fri"></div>
+      </div>
     </div>
   </div>
 </div>

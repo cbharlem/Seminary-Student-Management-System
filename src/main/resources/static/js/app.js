@@ -820,50 +820,136 @@ async function loadSchedule() {
     sel.innerHTML = '<option value="">Select section…</option>' +
       sections.map(s => `<option value="${s.sectionId}">${s.sectionName}</option>`).join('');
   } catch (_) {}
-  try {
-    const data = await api('/api/schedule');
-    _scheduleCache = {};
-    data.forEach(s => { _scheduleCache[s.scheduleId] = s; });
-    const tbody = document.getElementById('tbl-schedule');
-    tbody.innerHTML = data.map(s =>
-      `<tr>
-        <td>${escHtml(s.section?.sectionCode)}</td>
-        <td>${escHtml(s.course?.courseCode)} – ${escHtml(s.course?.courseName)}</td>
-        <td>${escHtml(s.instructor?.firstName)} ${escHtml(s.instructor?.lastName)}</td>
-        <td>${escHtml(s.room?.roomName)}</td>
-        <td>${escHtml(s.dayOfWeek)}</td>
-        <td>${escHtml(s.timeStart)} – ${escHtml(s.timeEnd)}</td>
-        <td style="display:flex;gap:6px">
-          <button class="btn btn-outline btn-sm registrar-only" onclick="openEditSchedModal('${escHtml(s.scheduleId)}')">Edit</button>
-          <button class="btn btn-danger btn-sm registrar-only" onclick="confirmDeleteSchedule('${escHtml(s.scheduleId)}')">Delete</button>
-        </td>
-      </tr>`
-    ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">No schedules yet</td></tr>';
-  } catch (e) { console.error(e); }
+  _renderScheduleTable([]);
+}
+
+function _renderScheduleTable(data) {
+  const tbody = document.getElementById('tbl-schedule');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);padding:20px">Select a section above to view its schedules</td></tr>';
+    return;
+  }
+  _scheduleCache = {};
+  data.forEach(s => { _scheduleCache[s.scheduleId] = s; });
+  tbody.innerHTML = data.map(s =>
+    `<tr>
+      <td>${escHtml(s.section?.sectionCode)}</td>
+      <td>${escHtml(s.course?.courseCode)} – ${escHtml(s.course?.courseName)}</td>
+      <td>${escHtml(s.instructor?.firstName)} ${escHtml(s.instructor?.lastName)}</td>
+      <td>${escHtml(s.room?.roomName)}</td>
+      <td>${escHtml(s.dayOfWeek)}</td>
+      <td>${_fmtTime(s.timeStart)} – ${_fmtTime(s.timeEnd)}</td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm registrar-only" onclick="openEditSchedModal('${escHtml(s.scheduleId)}')">Edit</button>
+        <button class="btn btn-danger btn-sm registrar-only" onclick="confirmDeleteSchedule('${escHtml(s.scheduleId)}')">Delete</button>
+      </td>
+    </tr>`
+  ).join('');
+}
+
+// ── Continuous-time calendar helpers ────────────────────────────────────────
+const SCHED_PX_PER_MIN = 1.5;          // 90 px per hour
+const SCHED_CAL_START  = 6  * 60;      // 6:00 AM in minutes
+const SCHED_CAL_END    = 22 * 60;      // 10:00 PM in minutes
+const SCHED_CAL_H      = (SCHED_CAL_END - SCHED_CAL_START) * SCHED_PX_PER_MIN; // 1440 px
+
+function _schedMin(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function _fmtTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  return `${h}:${m}`;
+}
+
+function _initSchedCal(gutterId, colPrefix) {
+  const DAYS = ['mon','tue','wed','thu','fri'];
+  const gutter = document.getElementById(gutterId);
+  if (!gutter) return;
+  gutter.style.height = SCHED_CAL_H + 'px';
+  gutter.innerHTML = '';
+  DAYS.forEach(d => {
+    const col = document.getElementById(`${colPrefix}-${d}`);
+    if (col) { col.style.height = SCHED_CAL_H + 'px'; col.innerHTML = ''; }
+  });
+  for (let h = 6; h <= 21; h++) {
+    const top = (h * 60 - SCHED_CAL_START) * SCHED_PX_PER_MIN;
+    const lbl = document.createElement('div');
+    lbl.className = 'sched-hour-label';
+    lbl.style.top = top + 'px';
+    lbl.textContent = h === 12 ? '12:00' : h < 12 ? `${h}:00` : `${h - 12}:00`;
+    gutter.appendChild(lbl);
+    DAYS.forEach(d => {
+      const col = document.getElementById(`${colPrefix}-${d}`);
+      if (!col) return;
+      const line = document.createElement('div');
+      line.className = 'sched-hour-line';
+      line.style.top = top + 'px';
+      col.appendChild(line);
+      if (h < 21) {
+        const half = document.createElement('div');
+        half.className = 'sched-hour-line minor';
+        half.style.top = (top + 30 * SCHED_PX_PER_MIN) + 'px';
+        col.appendChild(half);
+      }
+    });
+  }
+}
+
+function _renderSchedBlocks(colPrefix, data, editable) {
+  const DAY_MAP = { Monday:'mon', Tuesday:'tue', Wednesday:'wed', Thursday:'thu', Friday:'fri' };
+  const byDay   = { mon:[], tue:[], wed:[], thu:[], fri:[] };
+  data.forEach(s => { const d = DAY_MAP[s.dayOfWeek]; if (d) byDay[d].push(s); });
+
+  Object.entries(byDay).forEach(([day, scheds]) => {
+    const col = document.getElementById(`${colPrefix}-${day}`);
+    if (!col) return;
+    scheds.sort((a, b) => (a.timeStart || '').localeCompare(b.timeStart || ''));
+
+    // Greedy lane assignment — overlapping cards split into side-by-side lanes
+    const lanes = [];
+    const meta  = scheds.map(s => {
+      const startMin = _schedMin(s.timeStart);
+      const endMin   = _schedMin(s.timeEnd);
+      let lane = lanes.findIndex(end => end <= startMin);
+      if (lane === -1) { lane = lanes.length; lanes.push(endMin); }
+      else lanes[lane] = endMin;
+      return { s, startMin, endMin, lane };
+    });
+    const totalLanes = Math.max(lanes.length, 1);
+
+    meta.forEach(({ s, startMin, endMin, lane }, i) => {
+      const top    = (startMin - SCHED_CAL_START) * SCHED_PX_PER_MIN;
+      const height = Math.max((endMin - startMin) * SCHED_PX_PER_MIN, 28);
+      const color  = SCHED_COLORS[i % SCHED_COLORS.length];
+      const instr  = [s.instructor?.firstName, s.instructor?.lastName].filter(Boolean).join(' ');
+      const block  = document.createElement('div');
+      block.className = 'sched-block' + (editable ? ' editable' : '');
+      block.style.cssText = `top:${top}px;height:${height}px;`
+        + `left:calc(${(lane / totalLanes) * 100}% + 4px);`
+        + `width:calc(${100 / totalLanes}% - 8px);`
+        + `background:${color};color:#fff`;
+      block.innerHTML =
+        `<div class="si-course">${escHtml(s.course?.courseCode || '')}</div>`
+        + `<div class="si-time">${escHtml(_fmtTime(s.timeStart))}–${escHtml(_fmtTime(s.timeEnd))}</div>`
+        + (height > 52 ? `<div class="si-room">${escHtml(s.room?.roomName || '')}</div>` : '')
+        + (height > 72 && instr ? `<div class="si-instructor">${escHtml(instr)}</div>` : '');
+      if (editable) block.onclick = () => openEditSchedModal(s.scheduleId);
+      col.appendChild(block);
+    });
+  });
 }
 
 function loadScheduleGrid() {
+  _initSchedCal('gc-gutter', 'gc-col');
   const sectionId = document.getElementById('sched-section-filter')?.value;
-  if (!sectionId) return;
-  // Clear cells
-  document.querySelectorAll('[id^="gc-"]').forEach(c => c.innerHTML = '');
-  api(`/api/schedule?section=${sectionId}`).then(data => {
-    data.forEach((s, i) => {
-      const hour = parseInt(s.timeStart?.split(':')[0] || '7');
-      const dayMap = { Monday:'mon', Tuesday:'tue', Wednesday:'wed', Thursday:'thu', Friday:'fri' };
-      const day = dayMap[s.dayOfWeek];
-      if (!day) return;
-      const slots = [7,9,11,13,15];
-      const slot = slots.reduce((a,b) => Math.abs(b-hour) < Math.abs(a-hour) ? b : a);
-      const cell = document.getElementById(`gc-${day}-${slot}`);
-      if (cell) {
-        cell.innerHTML = `<div class="sched-item" style="background:${SCHED_COLORS[i%SCHED_COLORS.length]};color:white">
-          <div class="si-course">${s.course?.courseCode}</div>
-          <div class="si-room">${s.room?.roomName}</div>
-        </div>`;
-      }
-    });
-  }).catch(console.error);
+  if (!sectionId) { _renderScheduleTable([]); return; }
+  api(`/api/schedule?section=${sectionId}`)
+    .then(data => { _renderSchedBlocks('gc-col', data, true); _renderScheduleTable(data); })
+    .catch(console.error);
 }
 
 // Student list for grade search — loaded once, reused on every keystroke
@@ -1354,25 +1440,10 @@ function renderMyGradesForSem(semId) {
 }
 
 async function loadMySchedule() {
+  _initSchedCal('ms-gutter', 'ms-col');
   try {
     const data = await api('/api/schedule/mine');
-    // Clear
-    document.querySelectorAll('[id^="ms-"]').forEach(c => c.innerHTML = '');
-    data.forEach((s, i) => {
-      const hour = parseInt(s.timeStart?.split(':')[0] || '7');
-      const dayMap = { Monday:'mon', Tuesday:'tue', Wednesday:'wed', Thursday:'thu', Friday:'fri' };
-      const day = dayMap[s.dayOfWeek];
-      if (!day) return;
-      const slots = [7,9,11,13];
-      const slot = slots.reduce((a,b) => Math.abs(b-hour) < Math.abs(a-hour) ? b : a);
-      const cell = document.getElementById(`ms-${day}-${slot}`);
-      if (cell) {
-        cell.innerHTML = `<div class="sched-item" style="background:${SCHED_COLORS[i%SCHED_COLORS.length]};color:white">
-          <div class="si-course">${s.course?.courseCode}</div>
-          <div class="si-room">${s.room?.roomName}</div>
-        </div>`;
-      }
-    });
+    _renderSchedBlocks('ms-col', data, false);
   } catch (e) { console.error(e); }
 }
 
@@ -2320,7 +2391,7 @@ async function saveSchedule() {
       toast('Schedule saved');
     }
     alertEl.style.display = 'none';
-    closeSchedModal(); loadSchedule();
+    closeSchedModal(); loadScheduleGrid();
   } catch (e) {
     alertEl.textContent = e.message; alertEl.style.display = 'block';
   }
@@ -2336,7 +2407,7 @@ async function doDeleteSchedule() {
   try {
     await api(`/api/schedule/${_deleteSchedId}`, 'DELETE');
     toast('Schedule deleted');
-    closeModal('modal-sched-delete'); loadSchedule();
+    closeModal('modal-sched-delete'); loadScheduleGrid();
   } catch (e) { toast(e.message, 'error'); }
 }
 
