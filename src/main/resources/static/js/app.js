@@ -1068,8 +1068,8 @@ function _renderSchedBlocks(colPrefix, data, editable) {
       block.innerHTML =
         `<div class="si-course">${escHtml(s.course?.courseCode || '')}</div>`
         + `<div class="si-time">${escHtml(_fmtTime(s.timeStart))}–${escHtml(_fmtTime(s.timeEnd))}</div>`
-        + (height > 52 ? `<div class="si-room">${escHtml(s.room?.roomName || '')}</div>` : '')
-        + (height > 72 && instr ? `<div class="si-instructor">${escHtml(instr)}</div>` : '');
+        + `<div class="si-room">${escHtml(s.room?.roomName || '')}</div>`
+        + (instr ? `<div class="si-instructor">${escHtml(instr)}</div>` : '');
       if (editable) block.onclick = () => openEditSchedModal(s.scheduleId);
       col.appendChild(block);
     });
