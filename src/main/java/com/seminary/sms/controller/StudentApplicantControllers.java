@@ -276,10 +276,11 @@ class ApplicantController {
     @PreAuthorize("hasRole('Registrar')")
     public ResponseEntity<?> updateAppStatus(@PathVariable String appId, @RequestParam String status) {
         try {
-            // SECURITY (A08): Enum poisoning — catch invalid status values
             return ResponseEntity.ok(applicantService.updateStatus(appId, Application.ApplicationStatus.valueOf(status)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid status value."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -304,6 +305,27 @@ class ApplicantController {
         exam.setApplicant(applicant);
         exam.setExamId("EXM-" + System.currentTimeMillis());
         return ResponseEntity.ok(applicantService.recordExam(exam));
+    }
+
+    @PutMapping("/exams/{examId}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> updateExam(@PathVariable String examId, @RequestBody EntranceExam exam) {
+        try {
+            return ResponseEntity.ok(applicantService.updateExam(examId, exam));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/exams/{examId}")
+    @PreAuthorize("hasRole('Registrar')")
+    public ResponseEntity<?> deleteExam(@PathVariable String examId) {
+        try {
+            applicantService.deleteExam(examId);
+            return ResponseEntity.ok(Map.of("message", "Exam deleted"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js confirmAdmit() when the registrar admits a confirmed applicant

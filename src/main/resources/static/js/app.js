@@ -58,6 +58,9 @@ let _currentStudentId = null;
 let _scheduleCache = {};
 let _currentStudent = null;
 let _currentApplicantId = null;
+let _currentApplicantExams = [];
+let _previousApplicantStatus = null;
+let _currentExamId = null;
 let _currentReportType  = null;
 const _courseMap = {};
 
@@ -2586,26 +2589,122 @@ async function graduateStudent() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+function updateExamResult() {
+  const scoreVal  = document.getElementById('ex-score').value;
+  const maxScore  = parseFloat(document.getElementById('ex-max').value) || 100;
+  const score     = parseFloat(scoreVal);
+  const display   = document.getElementById('ex-result-display');
+  const hidden    = document.getElementById('ex-result');
+
+  if (scoreVal === '' || isNaN(score)) {
+    display.textContent  = 'Pending';
+    display.style.color  = 'var(--gray-400)';
+    hidden.value         = 'Pending';
+  } else if (score >= maxScore * 0.60) {
+    display.textContent  = 'Passed';
+    display.style.color  = 'var(--success,#16a34a)';
+    hidden.value         = 'Passed';
+  } else {
+    display.textContent  = 'Failed';
+    display.style.color  = 'var(--danger,#dc2626)';
+    hidden.value         = 'Failed';
+  }
+}
+
+async function refreshApplicantExams() {
+  try {
+    const exams = await api(`/api/applicants/${_currentApplicantId}/exams`);
+    _currentApplicantExams = exams || [];
+    document.getElementById('apd-exams-body').innerHTML = exams.length
+      ? exams.map(e => `<tr>
+          <td>${escHtml(e.examDate || '—')}</td>
+          <td>${escHtml(e.score ?? '—')}</td>
+          <td>${escHtml(e.maxScore ?? 100)}</td>
+          <td>${badge(e.result)}</td>
+          <td>${escHtml(e.remarks || '—')}</td>
+          <td style="white-space:nowrap;text-align:right">
+            <button class="btn btn-outline btn-sm registrar-only" onclick="openEditExamModal('${escHtml(e.examId)}')" style="padding:3px 10px;font-size:.72rem;margin-right:4px">Edit</button>
+            <button class="registrar-only" onclick="deleteExam('${escHtml(e.examId)}')" style="padding:3px 10px;font-size:.72rem;font-weight:600;font-family:inherit;background:var(--danger,#dc2626);color:#fff;border:none;border-radius:6px;cursor:pointer">Delete</button>
+          </td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;color:var(--gray-400,#9ca3af);padding:12px">No exams recorded</td></tr>';
+
+    // Re-evaluate any visible warnings now that exam data has changed
+    const latestExam = _currentApplicantExams
+      .slice()
+      .sort((a, b) => new Date(b.examDate) - new Date(a.examDate))[0];
+    const latestIsFailed = latestExam && latestExam.result === 'Failed';
+
+    // Status dropdown warning (shown when user picks Admitted from the dropdown)
+    const statusWarn = document.getElementById('apd-status-warn');
+    if (statusWarn && statusWarn.style.display !== 'none' && !latestIsFailed) {
+      statusWarn.style.display = 'none';
+      _previousApplicantStatus = null;
+    }
+
+    // Admit modal warning (shown inside the Admit confirmation modal)
+    const admitWarn = document.getElementById('admit-exam-warning');
+    if (admitWarn && admitWarn.style.display !== 'none' && !latestIsFailed) {
+      admitWarn.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
 function openExamModal(applicantId, name) {
   _currentApplicantId = applicantId;
+  _currentExamId = null;
+  document.getElementById('exam-modal-title').textContent = 'Record Entrance Exam';
   document.getElementById('exam-modal-sub').textContent = `Recording exam for ${name}`;
+  document.getElementById('ex-date').value    = '';
+  document.getElementById('ex-score').value   = '';
+  document.getElementById('ex-max').value     = '100';
+  document.getElementById('ex-remarks').value = '';
+  updateExamResult();
   openModal('modal-exam');
 }
 
-async function saveExam() {
-  if (!validateRequired([
-    {id:'ex-date',   label:'Exam Date'},
-    {id:'ex-result', label:'Result'},
-  ])) return;
+function openEditExamModal(examId) {
+  const exam = _currentApplicantExams.find(e => e.examId === examId);
+  if (!exam) return;
+  _currentExamId = examId;
+  document.getElementById('exam-modal-title').textContent = 'Edit Exam Record';
+  document.getElementById('exam-modal-sub').textContent = `Editing exam from ${exam.examDate}`;
+  document.getElementById('ex-date').value    = exam.examDate || '';
+  document.getElementById('ex-score').value   = exam.score ?? '';
+  document.getElementById('ex-max').value     = exam.maxScore ?? 100;
+  document.getElementById('ex-remarks').value = exam.remarks || '';
+  updateExamResult();
+  openModal('modal-exam');
+}
+
+async function deleteExam(examId) {
+  if (!confirm('Delete this exam record? This cannot be undone.')) return;
   try {
-    await api(`/api/applicants/${_currentApplicantId}/exams`, 'POST', {
-      examDate: document.getElementById('ex-date').value,
-      score:    parseFloat(document.getElementById('ex-score').value) || null,
-      maxScore: parseFloat(document.getElementById('ex-max').value) || 100,
-      result:   document.getElementById('ex-result').value,
-      remarks:  document.getElementById('ex-remarks').value,
-    });
-    toast('Exam recorded'); closeModal('modal-exam');
+    await api(`/api/applicants/exams/${examId}`, 'DELETE');
+    toast('Exam record deleted');
+    await refreshApplicantExams();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function saveExam() {
+  if (!validateRequired([{id:'ex-date', label:'Exam Date'}])) return;
+  const payload = {
+    examDate: document.getElementById('ex-date').value,
+    score:    parseFloat(document.getElementById('ex-score').value) || null,
+    maxScore: parseFloat(document.getElementById('ex-max').value) || 100,
+    result:   document.getElementById('ex-result').value,
+    remarks:  document.getElementById('ex-remarks').value,
+  };
+  try {
+    if (_currentExamId) {
+      await api(`/api/applicants/exams/${_currentExamId}`, 'PUT', payload);
+      toast('Exam updated');
+    } else {
+      await api(`/api/applicants/${_currentApplicantId}/exams`, 'POST', payload);
+      toast('Exam recorded');
+    }
+    closeModal('modal-exam');
+    await refreshApplicantExams();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2676,6 +2775,7 @@ async function viewApplicantDetail(id) {
   try {
     const a = await api(`/api/applicants/${id}`);
     _currentApplicantId = id;
+    _currentApplicantExams = [];
 
     document.getElementById('apd-title').textContent = `${a.firstName} ${a.lastName}`;
     document.getElementById('apd-sub').textContent   = `${a.applicantId} · ${a.appliedProgram?.programCode || '—'}`;
@@ -2709,25 +2809,17 @@ async function viewApplicantDetail(id) {
     try {
       const app = await api(`/api/applicants/${id}/application`);
       currentStatus = app?.applicationStatus || 'Applied';
-      document.getElementById('apd-status').value = currentStatus;
-      const label = document.querySelector(`#apd-status option[value="${currentStatus}"]`)?.textContent || currentStatus;
-      document.getElementById('apd-status-view').textContent = label;
-    } catch (_) {
-      document.getElementById('apd-status').value = 'Applied';
-      document.getElementById('apd-status-view').textContent = 'Applied';
-    }
+    } catch (_) {}
+    const statusEl = document.getElementById('apd-status');
+    statusEl.value = currentStatus;
+    statusEl.dataset.savedValue = currentStatus;
+    document.getElementById('apd-status-warn').style.display = 'none';
 
     // Show Admit button only when convention is done and not yet admitted
     document.getElementById('apd-admit-btn').style.display =
       currentStatus === 'AspiringConventionAttended' ? '' : 'none';
 
-    // Load exams
-    try {
-      const exams = await api(`/api/applicants/${id}/exams`);
-      document.getElementById('apd-exams-body').innerHTML = exams.length
-        ? exams.map(e => `<tr><td>${escHtml(e.examDate || '—')}</td><td>${escHtml(e.score ?? '—')}</td><td>${escHtml(e.maxScore ?? 100)}</td><td>${badge(e.result)}</td><td>${escHtml(e.remarks || '—')}</td></tr>`).join('')
-        : '<tr><td colspan="5" style="text-align:center;color:var(--gray-400,#9ca3af);padding:12px">No exams recorded</td></tr>';
-    } catch (_) {}
+    await refreshApplicantExams();
 
     // Reset to first tab and view mode
     switchTab(document.querySelector('#modal-applicant-detail .tab'), 'apd-tab-personal', ['apd-tab-personal','apd-tab-family','apd-tab-exams']);
@@ -2740,6 +2832,11 @@ async function viewApplicantDetail(id) {
 function openAdmitModal() {
   const name = document.getElementById('apd-title').textContent;
   document.getElementById('admit-sub').textContent = `Admitting: ${name}`;
+  const warningEl = document.getElementById('admit-exam-warning');
+  const latest = _currentApplicantExams
+    .slice()
+    .sort((a, b) => new Date(b.examDate) - new Date(a.examDate))[0];
+  warningEl.style.display = (latest && latest.result === 'Failed') ? 'block' : 'none';
   openModal('modal-admit');
 }
 
@@ -2766,12 +2863,53 @@ function applicantEditMode(on) {
   });
   document.getElementById('apd-level').disabled   = !on;
   document.getElementById('apd-program').disabled = !on;
-  document.getElementById('apd-status-view').style.display = on ? 'none' : '';
-  document.getElementById('apd-status').style.display      = on ? '' : 'none';
-  document.getElementById('apd-edit-btn').style.display    = on ? 'none' : '';
-  document.getElementById('apd-admit-btn').style.display   = on ? 'none' : (document.getElementById('apd-status').value === 'AspiringConventionAttended' ? '' : 'none');
+  document.getElementById('apd-edit-btn').style.display  = on ? 'none' : '';
+  document.getElementById('apd-admit-btn').style.display =
+    on ? 'none' : (document.getElementById('apd-status').value === 'AspiringConventionAttended' ? '' : 'none');
   document.getElementById('apd-actions').style.display     = on ? '' : 'none';
   document.getElementById('apd-modal').classList.toggle('editing', on);
+}
+
+function onApplicantStatusChange() {
+  const select   = document.getElementById('apd-status');
+  const newStatus = select.value;
+  if (newStatus === 'Admitted') {
+    const latest = _currentApplicantExams
+      .slice()
+      .sort((a, b) => new Date(b.examDate) - new Date(a.examDate))[0];
+    if (latest && latest.result === 'Failed') {
+      _previousApplicantStatus = select.dataset.savedValue || 'Applied';
+      document.getElementById('apd-status-warn').style.display = 'block';
+      return;
+    }
+  }
+  document.getElementById('apd-status-warn').style.display = 'none';
+  _doSaveApplicantStatus(newStatus);
+}
+
+async function confirmApplicantStatusAdmit() {
+  document.getElementById('apd-status-warn').style.display = 'none';
+  await _doSaveApplicantStatus('Admitted');
+}
+
+function cancelApplicantStatusAdmit() {
+  document.getElementById('apd-status-warn').style.display = 'none';
+  const select = document.getElementById('apd-status');
+  select.value = _previousApplicantStatus || 'Applied';
+  _previousApplicantStatus = null;
+}
+
+async function _doSaveApplicantStatus(status) {
+  try {
+    const app = await api(`/api/applicants/${_currentApplicantId}/application`);
+    if (!app) return;
+    await api(`/api/applicants/applications/${app.applicationId}/status?status=${status}`, 'PATCH');
+    document.getElementById('apd-status').dataset.savedValue = status;
+    document.getElementById('apd-admit-btn').style.display =
+      status === 'AspiringConventionAttended' ? '' : 'none';
+    loadApplicants();
+    toast('Status updated');
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 async function saveApplicantEdit() {
@@ -2780,15 +2918,6 @@ async function saveApplicantEdit() {
     {id:'apd-lname', label:'Last Name'},
   ])) return;
   try {
-    // Save status change if there's an application record
-    try {
-      const app = await api(`/api/applicants/${_currentApplicantId}/application`);
-      if (app) {
-        const status = document.getElementById('apd-status').value;
-        await api(`/api/applicants/applications/${app.applicationId}/status?status=${status}`, 'PATCH');
-      }
-    } catch (_) {}
-
     await api(`/api/applicants/${_currentApplicantId}`, 'PUT', {
       firstName:          document.getElementById('apd-fname').value,
       lastName:           document.getElementById('apd-lname').value,
@@ -2811,10 +2940,6 @@ async function saveApplicantEdit() {
       religion:           document.getElementById('apd-religion').value,
       appliedProgram:     { programId: document.getElementById('apd-program').value },
     });
-    // Update the status label in view mode
-    const status = document.getElementById('apd-status').value;
-    const label = document.querySelector(`#apd-status option[value="${status}"]`)?.textContent || status;
-    document.getElementById('apd-status-view').textContent = label;
     toast('Applicant updated successfully');
     applicantEditMode(false);
     loadApplicants();

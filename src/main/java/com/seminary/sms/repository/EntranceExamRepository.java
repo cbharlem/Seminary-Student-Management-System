@@ -24,4 +24,6 @@ public interface EntranceExamRepository extends JpaRepository<EntranceExam, Inte
     // Auto-generates: JOIN tblapplicants ON ... WHERE tblapplicants.fldApplicantID = ?
     // Called by: ApplicantService.getExams() to list all entrance exam results for an applicant
     List<EntranceExam> findByApplicant_ApplicantId(String applicantId);
+
+    java.util.Optional<EntranceExam> findByExamId(String examId);
 }

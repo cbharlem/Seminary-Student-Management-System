@@ -1517,18 +1517,26 @@
       </div>
     </div>
     <!-- Status bar -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:12px;background:var(--gray-50,#f9fafb);border-radius:8px;border:1px solid var(--gray-200,#e5e7eb)">
-      <label style="font-size:.8rem;font-weight:600;color:var(--gray-500,#6b7280);white-space:nowrap">Application Status</label>
-      <span id="apd-status-view" style="font-size:.85rem;font-weight:500"></span>
-      <select id="apd-status" style="flex:1;display:none">
-        <option value="Applied">Applied</option>
-        <option value="Interviewed">Interviewed</option>
-        <option value="AspiringConventionAttended">Convention Attended</option>
-        <option value="Admitted">Admitted</option>
-        <option value="Enrolled">Enrolled</option>
-        <option value="Rejected">Rejected</option>
-        <option value="Withdrawn">Withdrawn</option>
-      </select>
+    <div style="margin-bottom:16px;padding:12px 14px;background:var(--gray-50,#f9fafb);border-radius:8px;border:1px solid var(--gray-200,#e5e7eb)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:.8rem;font-weight:600;color:var(--gray-500,#6b7280);white-space:nowrap">Application Status</label>
+        <select id="apd-status" class="form-select" style="flex:1" onchange="onApplicantStatusChange()">
+          <option value="Applied">Applied</option>
+          <option value="Interviewed">Interviewed</option>
+          <option value="AspiringConventionAttended">Convention Attended</option>
+          <option value="Admitted">Admitted</option>
+          <option value="Enrolled">Enrolled</option>
+          <option value="Rejected">Rejected</option>
+          <option value="Withdrawn">Withdrawn</option>
+        </select>
+      </div>
+      <div id="apd-status-warn" style="display:none;margin-top:10px;background:#fffbeb;color:#92400e;font-size:.8rem;padding:10px 12px;border-radius:6px;border:1px solid #fde68a">
+        <strong>⚠ Warning:</strong> This applicant's most recent entrance exam result is <strong>Failed</strong>. Are you sure you want to admit them?
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button onclick="confirmApplicantStatusAdmit()" style="background:#d97706;color:#fff;border:none;font-size:.75rem;font-weight:600;padding:5px 14px;border-radius:5px;cursor:pointer;font-family:inherit">Yes, Admit Anyway</button>
+          <button onclick="cancelApplicantStatusAdmit()" style="background:white;color:#374151;border:1.5px solid var(--gray-200,#e5e7eb);font-size:.75rem;font-weight:500;padding:5px 14px;border-radius:5px;cursor:pointer;font-family:inherit">Cancel</button>
+        </div>
+      </div>
     </div>
     <!-- Tabs -->
     <div class="tabs" style="margin-bottom:14px">
@@ -1569,11 +1577,11 @@
     <!-- Exams tab -->
     <div id="apd-tab-exams" style="display:none">
       <table style="width:100%;font-size:.82rem">
-        <thead><tr><th>Date</th><th>Score</th><th>Max</th><th>Result</th><th>Remarks</th></tr></thead>
+        <thead><tr><th>Date</th><th>Score</th><th>Max</th><th>Result</th><th>Remarks</th><th></th></tr></thead>
         <tbody id="apd-exams-body"><tr><td colspan="5" style="text-align:center;color:var(--gray-400,#9ca3af);padding:12px">No exams recorded</td></tr></tbody>
       </table>
       <div style="margin-top:10px;text-align:right">
-        <button class="btn btn-outline btn-sm registrar-only" onclick="closeModal('modal-applicant-detail');openExamModal(_currentApplicantId, document.getElementById('apd-title').textContent)">+ Record Exam</button>
+        <button class="btn btn-outline btn-sm registrar-only" onclick="openExamModal(_currentApplicantId, document.getElementById('apd-title').textContent)">+ Record Exam</button>
       </div>
     </div>
     <!-- Actions — only visible in edit mode -->
@@ -1589,8 +1597,11 @@
   <div class="modal" style="max-width:420px">
     <h3>Admit Applicant</h3>
     <p class="modal-sub" id="admit-sub"></p>
-    <div style="background:var(--info-bg);color:var(--info);font-size:.8rem;padding:10px 12px;border-radius:6px;margin-top:4px;margin-bottom:4px">
+    <div style="background:var(--info-bg);color:var(--info);font-size:.8rem;padding:10px 12px;border-radius:6px;margin-top:4px">
       This marks the applicant as <strong>Admitted</strong>. Their student record and login account will be created when you enroll them in the Enrollment module.
+    </div>
+    <div id="admit-exam-warning" style="display:none;background:#fffbeb;color:#d97706;font-size:.8rem;padding:10px 12px;border-radius:6px;margin-top:8px;border:1px solid #fde68a">
+      <strong>⚠ Warning:</strong> This applicant's most recent entrance exam result is <strong>Failed</strong>. Are you sure you want to admit them anyway?
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-admit')">Cancel</button>
@@ -1634,12 +1645,16 @@
 <!-- Entrance Exam -->
 <div class="modal-overlay" id="modal-exam">
   <div class="modal">
-    <h3>Record Entrance Exam</h3><p class="modal-sub" id="exam-modal-sub"></p>
+    <h3 id="exam-modal-title">Record Entrance Exam</h3><p class="modal-sub" id="exam-modal-sub"></p>
     <div class="modal-grid">
       <div class="field"><label for="ex-date">Exam Date <span style="color:var(--danger)">*</span></label><input id="ex-date" type="date" required/></div>
-      <div class="field"><label for="ex-score">Score</label><input id="ex-score" type="number" step="0.01" placeholder="e.g. 85"/></div>
-      <div class="field"><label for="ex-max">Max Score</label><input id="ex-max" type="number" value="100" placeholder="e.g. 100"/></div>
-      <div class="field"><label for="ex-result">Result</label><select id="ex-result"><option>Pending</option><option>Passed</option><option>Failed</option></select></div>
+      <div class="field"><label for="ex-score">Score</label><input id="ex-score" type="number" step="0.01" placeholder="e.g. 85" oninput="updateExamResult()"/></div>
+      <div class="field"><label for="ex-max">Max Score</label><input id="ex-max" type="number" value="100" placeholder="e.g. 100" oninput="updateExamResult()"/></div>
+      <div class="field">
+        <label>Result <span style="font-size:0.75rem;font-weight:400;color:var(--gray-400)">(auto-computed · 60% to pass)</span></label>
+        <div id="ex-result-display" style="padding:9px 13px;border:1.5px solid var(--gray-200);border-radius:7px;font-size:0.875rem;background:var(--gray-50);font-weight:600;color:var(--gray-400)">Pending</div>
+        <input type="hidden" id="ex-result" value="Pending"/>
+      </div>
       <div class="field full"><label for="ex-remarks">Remarks</label><textarea id="ex-remarks" rows="2" placeholder="Optional notes about the exam result"></textarea></div>
     </div>
     <div class="modal-actions">

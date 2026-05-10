@@ -40,6 +40,7 @@ public class ApplicantService {
     private final ApplicantRepository applicantRepository;
     private final ApplicationRepository applicationRepository;
     private final EntranceExamRepository entranceExamRepository;
+    private final StudentRepository studentRepository;
 
     // LAYER 2 → LAYER 3: Called when the controller needs all applicants without filtering
     // LAYER 3 → LAYER 4: Calls applicantRepository.findAll()
@@ -66,6 +67,8 @@ public class ApplicantService {
     public Application updateStatus(String applicationId, Application.ApplicationStatus status) {
         Application app = applicationRepository.findByApplicationId(applicationId)
             .orElseThrow(() -> new RuntimeException("Application not found: " + applicationId));
+        if (studentRepository.existsByApplication_ApplicationId(applicationId))
+            throw new RuntimeException("Status cannot be changed — this applicant has already been enrolled as a student.");
         app.setApplicationStatus(status);
         return applicationRepository.save(app);
     }
@@ -75,6 +78,25 @@ public class ApplicantService {
     @Transactional
     public EntranceExam recordExam(EntranceExam exam) {
         return entranceExamRepository.save(exam);
+    }
+
+    @Transactional
+    public EntranceExam updateExam(String examId, EntranceExam updated) {
+        EntranceExam exam = entranceExamRepository.findByExamId(examId)
+            .orElseThrow(() -> new RuntimeException("Exam not found: " + examId));
+        exam.setExamDate(updated.getExamDate());
+        exam.setScore(updated.getScore());
+        exam.setMaxScore(updated.getMaxScore());
+        exam.setResult(updated.getResult());
+        exam.setRemarks(updated.getRemarks());
+        return entranceExamRepository.save(exam);
+    }
+
+    @Transactional
+    public void deleteExam(String examId) {
+        EntranceExam exam = entranceExamRepository.findByExamId(examId)
+            .orElseThrow(() -> new RuntimeException("Exam not found: " + examId));
+        entranceExamRepository.delete(exam);
     }
 
     // LAYER 2 → LAYER 3: Utility method to filter applications by status (e.g. only Admitted ones)
