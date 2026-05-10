@@ -38,11 +38,20 @@ import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
 import com.seminary.sms.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -158,33 +167,149 @@ class ScheduleMeController {
 class BackupController {
 
     private final BackupLogRepository backupLogRepository;
+    private final UserRepository userRepository;
+    private final AuditService auditService;
 
-    // LAYER 1 → LAYER 2: Triggered by app.js loadBackup() to show the backup history table
-    // LAYER 2 → LAYER 4: Calls backupLogRepository.findAllByOrderByBackupDateDesc() — newest entries first
-    // LAYER 2 → LAYER 1: Returns a JSON list of BackupLog records
-    /**
-     * GET /api/backup/log
-     * Returns the full list of past backup log entries.
-     */
+    @Value("${spring.datasource.username:root}")
+    private String dbUser;
+
+    @Value("${spring.datasource.password:}")
+    private String dbPass;
+
+    @Value("${sms.db.name:dbstudentmanagementsystem}")
+    private String dbName;
+
+    @Value("${sms.db.bin-path:}")
+    private String dbBinPath;
+
     @GetMapping("/log")
     @PreAuthorize("hasRole('Admin')")
     public List<BackupLog> getLog() {
         return backupLogRepository.findAllByOrderByBackupDateDesc();
     }
 
-    // LAYER 1 → LAYER 2: Triggered by app.js triggerBackup() when the admin requests a backup
-    // Currently returns a placeholder message — full implementation would use ProcessBuilder + mysqldump
-    // LAYER 2 → LAYER 1: Returns an informational message JSON
-    /**
-     * POST /api/backup/create
-     * NOTE: Full mysqldump integration requires runtime shell access.
-     * For a local academic deployment, this endpoint signals the intent.
-     * Implement with ProcessBuilder + mysqldump for production use.
-     */
+    private String resolveBin(String exe) {
+        if (dbBinPath != null && !dbBinPath.isBlank()) {
+            String configured = dbBinPath + "\\" + exe + ".exe";
+            try {
+                Process p = new ProcessBuilder(configured, "--version").start();
+                p.waitFor();
+                return configured;
+            } catch (Exception ignored) {}
+        }
+        String[] fallbacks = {
+            exe,
+            "C:\\xampp\\mysql\\bin\\" + exe + ".exe",
+            "C:\\xampp\\mariadb\\bin\\" + exe + ".exe",
+            "C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\" + exe + ".exe"
+        };
+        for (String candidate : fallbacks) {
+            try {
+                Process p = new ProcessBuilder(candidate, "--version").start();
+                p.waitFor();
+                return candidate;
+            } catch (Exception ignored) {}
+        }
+        return exe;
+    }
+
     @PostMapping("/create")
     @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<?> createBackup(Authentication auth) {
-        // SECURITY (A05): Never expose DB credentials, names, or implementation details in responses
-        return ResponseEntity.ok(Map.of("message", "Backup feature is not yet implemented."));
+        try {
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename  = "sms_backup_" + timestamp + ".sql";
+
+            List<String> cmd = new java.util.ArrayList<>();
+            cmd.add(resolveBin("mysqldump"));
+            cmd.add("-u"); cmd.add(dbUser);
+            if (dbPass != null && !dbPass.isBlank()) cmd.add("-p" + dbPass);
+            cmd.add("--single-transaction");
+            cmd.add("--no-tablespaces");
+            cmd.add(dbName);
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(false);
+            Process proc = pb.start();
+
+            byte[] sql = proc.getInputStream().readAllBytes();
+            int exit  = proc.waitFor();
+
+            if (exit != 0)
+                return ResponseEntity.status(500).body(Map.of("error", "mysqldump failed. The database could not be exported."));
+
+            userRepository.findByUsername(auth.getName()).ifPresent(u -> {
+                BackupLog log = BackupLog.builder()
+                    .backupId("BCK-" + System.currentTimeMillis())
+                    .backupFilePath(filename)
+                    .backupType(BackupLog.BackupType.Manual)
+                    .performedBy(u)
+                    .notes("Manual backup")
+                    .build();
+                backupLogRepository.save(log);
+            });
+            auditService.log("BACKUP_CREATED", "Database", "Manual backup downloaded: " + filename);
+
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(sql);
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(Map.of("error", "mysqldump not found. Make sure MySQL is installed and accessible."));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return ResponseEntity.status(500).body(Map.of("error", "Backup was interrupted."));
+        }
+    }
+
+    @PostMapping("/restore")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<?> restore(@RequestParam MultipartFile file, Authentication auth) {
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || !originalName.toLowerCase().endsWith(".sql"))
+            return ResponseEntity.badRequest().body(Map.of("error", "Only .sql files are accepted."));
+
+        Path temp = null;
+        try {
+            temp = Files.createTempFile("sms_restore_", ".sql");
+            file.transferTo(temp);
+
+            List<String> cmd = new java.util.ArrayList<>();
+            cmd.add(resolveBin("mysql"));
+            cmd.add("-u"); cmd.add(dbUser);
+            if (dbPass != null && !dbPass.isBlank()) cmd.add("-p" + dbPass);
+            cmd.add(dbName);
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectInput(temp.toFile());
+            pb.redirectErrorStream(false);
+            Process proc = pb.start();
+            int exit = proc.waitFor();
+
+            if (exit != 0)
+                return ResponseEntity.status(500).body(Map.of("error", "Restore failed. The SQL file may be invalid or corrupted."));
+
+            final String name = originalName;
+            userRepository.findByUsername(auth.getName()).ifPresent(u -> {
+                BackupLog log = BackupLog.builder()
+                    .backupId("BCK-" + System.currentTimeMillis())
+                    .backupFilePath(name)
+                    .backupType(BackupLog.BackupType.Manual)
+                    .performedBy(u)
+                    .notes("Database restored from: " + name)
+                    .build();
+                backupLogRepository.save(log);
+            });
+            auditService.log("DATABASE_RESTORED", "Database", "Database restored from file: " + originalName);
+
+            return ResponseEntity.ok(Map.of("message", "Database restored successfully."));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(Map.of("error", "mysql client not found. Make sure MySQL is installed and accessible."));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return ResponseEntity.status(500).body(Map.of("error", "Restore was interrupted."));
+        } finally {
+            if (temp != null) try { Files.deleteIfExists(temp); } catch (IOException ignored) {}
+        }
     }
 }

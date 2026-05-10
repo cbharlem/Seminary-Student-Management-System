@@ -1415,8 +1415,11 @@ function closeSemModal() {
 async function loadBackup() {
   try {
     const data = await api('/api/backup/log');
-    if (!Array.isArray(data) || !data.length) return;
     const tbody = document.getElementById('tbl-backup');
+    if (!Array.isArray(data) || !data.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--gray-400);padding:20px">No backup records yet.</td></tr>';
+      return;
+    }
     tbody.innerHTML = data.map(b =>
       `<tr><td>${fmtDate(b.backupDate)}</td><td>${escHtml(b.backupType)}</td><td>${escHtml(b.performedBy?.username || '—')}</td><td>${escHtml(b.notes || '—')}</td></tr>`
     ).join('');
@@ -3076,8 +3079,56 @@ function closeReportPreview() {
   document.getElementById('report-preview-iframe').src = 'about:blank';
 }
 
-function triggerBackup() {
-  toast('Backup requires backend implementation via mysqldump. API endpoint: /api/backup/create', 'info');
+async function triggerBackup() {
+  const btn = document.getElementById('btn-download-backup');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating backup…'; }
+  try {
+    const resp = await fetch('/api/backup/create', { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      toast(err.error || 'Backup failed.', 'error'); return;
+    }
+    const blob = await resp.blob();
+    const disposition = resp.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match ? match[1] : 'sms_backup.sql';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    toast('Backup downloaded: ' + filename, 'success');
+    loadBackup();
+  } catch (e) {
+    toast('Backup failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Backup'; }
+  }
+}
+
+function triggerRestore() {
+  document.getElementById('restore-file-input').click();
+}
+
+async function doRestore(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!confirm(`Restoring will OVERWRITE the entire database with "${file.name}".\n\nThis cannot be undone. Are you sure?`)) return;
+  const btn = document.getElementById('btn-restore');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Restoring…'; }
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const resp = await fetch('/api/backup/restore', { method: 'POST', body: form });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { toast(data.error || 'Restore failed.', 'error'); return; }
+    toast('Database restored successfully. Refresh the page to see updated data.', 'success');
+    loadBackup();
+  } catch (e) {
+    toast('Restore failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬆ Upload & Restore'; }
+  }
 }
 
 async function viewApplicantDetail(id) {
