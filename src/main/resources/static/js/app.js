@@ -735,7 +735,7 @@ async function activateCurriculum(programId) {
 function _updateAddCourseButtonState(programId) {
   const cur = (_curricula[programId] || []).find(c => c.curriculumId === _selectedCurriculum[programId]);
   const btn = document.getElementById('btn-add-course');
-  if (btn) btn.disabled = !(cur?.isActive === true);
+  if (btn) btn.disabled = !cur; // disabled only if no curriculum is selected at all
 }
 
 function renderCurriculumTable(programId) {
@@ -745,7 +745,7 @@ function renderCurriculumTable(programId) {
   const sem     = _currSem[programId]  || 1;
   const rows    = (_currCourses[programId] || []).filter(c => c.yearLevel === year && c.semesterNumber === sem);
   const cur     = (_curricula[programId] || []).find(c => c.curriculumId === _selectedCurriculum[programId]);
-  const editable = cur?.isActive === true;
+  const editable = !!cur; // editable whenever a curriculum is selected (backend enforces safety)
 
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No courses for this semester.</p></div></td></tr>';
@@ -2100,12 +2100,30 @@ async function saveCourse() {
     semesterNumber: parseInt(document.getElementById('co-sem').value),
     isActive:       true,
   };
+  const prereqCourseId = document.getElementById('co-prereq').value;
   try {
     if (id) {
       await api(`/api/curriculum/courses/${id}`, 'PUT', payload);
+      // Delete all existing prereqs for this course, then add the new one if selected
+      const existingPrereqs = _courseMap[id]?.prerequisites || [];
+      for (const p of existingPrereqs) {
+        await api(`/api/curriculum/prerequisites/${p.index}`, 'DELETE');
+      }
+      if (prereqCourseId) {
+        await api('/api/curriculum/prerequisites', 'POST', {
+          course:              { courseId: id },
+          prerequisiteCourse:  { courseId: prereqCourseId },
+        });
+      }
       toast('Course updated');
     } else {
-      await api('/api/curriculum/courses', 'POST', payload);
+      const saved = await api('/api/curriculum/courses', 'POST', payload);
+      if (prereqCourseId) {
+        await api('/api/curriculum/prerequisites', 'POST', {
+          course:              { courseId: saved.courseId },
+          prerequisiteCourse:  { courseId: prereqCourseId },
+        });
+      }
       toast('Course added');
     }
     closeModal('modal-course');
@@ -2120,13 +2138,12 @@ function deleteCourse(courseId) {
 
 async function confirmDeleteCourse() {
   const id = document.getElementById('del-course-id').value;
+  const programId = _courseMap[id]?.program?.programId;
   try {
     await api(`/api/curriculum/courses/${id}`, 'DELETE');
     toast('Course deleted');
     closeModal('modal-course-delete');
-    // Reload courses for both programs under their currently selected curriculum
-    await loadCurriculum('PRG-1001');
-    await loadCurriculum('PRG-1002');
+    await loadCurriculum(programId || 'PRG-1001');
   } catch (e) { toast(e.message, 'error'); }
 }
 

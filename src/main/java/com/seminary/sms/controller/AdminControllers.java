@@ -154,6 +154,7 @@ class CurriculumController {
             }
 
             // Re-create prerequisite links using the new course IDs
+            long preSeq = prerequisiteRepository.count();
             for (Course src : sourceCourses) {
                 List<Prerequisite> prereqs = prerequisiteRepository.findByCourse_CourseId(src.getCourseId());
                 for (Prerequisite p : prereqs) {
@@ -162,7 +163,7 @@ class CurriculumController {
                         ? oldToNewId.get(p.getPrerequisiteCourse().getCourseId()) : null;
                     if (newCourseId == null || newPrereqId == null) continue;
                     Prerequisite np = new Prerequisite();
-                    np.setPrerequisiteId("PRE-" + System.currentTimeMillis() + "-" + newPrereqId);
+                    np.setPrerequisiteId("PRE-" + String.format("%04d", ++preSeq));
                     courseRepository.findByCourseId(newCourseId).ifPresent(np::setCourse);
                     courseRepository.findByCourseId(newPrereqId).ifPresent(np::setPrerequisiteCourse);
                     prerequisiteRepository.save(np);
@@ -312,6 +313,7 @@ class CurriculumController {
     // LAYER 2 → LAYER 1: Returns HTTP 204 No Content on success, or 404 if not found
     @DeleteMapping("/courses/{id}")
     @PreAuthorize("hasRole('Registrar')")
+    @Transactional
     public ResponseEntity<?> deleteCourse(@PathVariable String id) {
         Course existing = courseRepository.findByCourseId(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
@@ -329,8 +331,19 @@ class CurriculumController {
                 String.join(", ", affected) + ". Create a new curriculum version to remove courses."));
         }
 
+        // Check if this course is listed as a prerequisite for other courses
+        List<Prerequisite> usedAsPrereq = prerequisiteRepository.findByPrerequisiteCourse_CourseId(id);
+        if (!usedAsPrereq.isEmpty()) {
+            List<String> dependents = usedAsPrereq.stream()
+                .map(p -> p.getCourse().getCourseCode())
+                .distinct().sorted()
+                .collect(java.util.stream.Collectors.toList());
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot delete — this course is a prerequisite for: " +
+                String.join(", ", dependents) + ". Remove those prerequisite links first."));
+        }
+
         prerequisiteRepository.deleteByCourse_CourseId(id);
-        prerequisiteRepository.deleteByPrerequisiteCourse_CourseId(id);
         courseRepository.delete(existing);
         return ResponseEntity.noContent().build();
     }

@@ -18,6 +18,8 @@ package com.seminary.sms.repository;
 
 import com.seminary.sms.entity.Prerequisite;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 public interface PrerequisiteRepository extends JpaRepository<Prerequisite, Integer> {
 
@@ -29,12 +31,13 @@ public interface PrerequisiteRepository extends JpaRepository<Prerequisite, Inte
     // Called by: CurriculumController.getPrerequisites() to list what a course requires
     List<Prerequisite> findByCourse_CourseId(String courseId);
 
+    List<Prerequisite> findByPrerequisiteCourse_CourseId(String courseId);
+
     // Auto-generates: DELETE FROM tblprerequisites WHERE tblcourses.fldCourseID = ? (main course side)
     // Called by: CurriculumController.deleteCourse() to remove all rules where this course is the main subject
+    @Modifying @Transactional
     void deleteByCourse_CourseId(String courseId);
 
-    // Auto-generates: DELETE FROM tblprerequisites WHERE prerequisite_course.fldCourseID = ?
-    // Called by: CurriculumController.deleteCourse() to also remove rules where this course is the prerequisite
-    // Both deletes together ensure no orphaned prerequisite rules remain after a course is removed
+    @Modifying @Transactional
     void deleteByPrerequisiteCourse_CourseId(String courseId);
 }
