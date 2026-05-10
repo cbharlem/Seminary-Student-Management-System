@@ -1059,8 +1059,15 @@ function _renderSchedBlocks(colPrefix, data, editable) {
       const height = Math.max((endMin - startMin) * SCHED_PX_PER_MIN, 28);
       const color  = SCHED_COLORS[i % SCHED_COLORS.length];
       const instr  = [s.instructor?.firstName, s.instructor?.lastName].filter(Boolean).join(' ');
+      const tooltipParts = [
+        s.course?.courseCode,
+        `${_fmtTime(s.timeStart)}–${_fmtTime(s.timeEnd)}`,
+        s.room?.roomName,
+        instr
+      ].filter(Boolean);
       const block  = document.createElement('div');
       block.className = 'sched-block' + (editable ? ' editable' : '');
+      block.title = tooltipParts.join(' | ');
       block.style.cssText = `top:${top}px;height:${height}px;`
         + `left:calc(${(lane / totalLanes) * 100}% + 4px);`
         + `width:calc(${100 / totalLanes}% - 8px);`
