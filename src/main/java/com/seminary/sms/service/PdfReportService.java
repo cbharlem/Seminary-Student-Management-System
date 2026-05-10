@@ -158,8 +158,7 @@ public class PdfReportService {
 
                 for (Enrollment enr : yearEntry.getValue()) {
                     Semester sem = enr.getSemester();
-                    String semLabel = sem.getSemesterLabel() + " — " +
-                            (sem.getSchoolYear() != null ? sem.getSchoolYear().getYearLabel() : "");
+                    String semLabel = sem.getSemesterLabel();
 
                     doc.add(new Paragraph(semLabel)
                             .setFont(getBold()).setFontSize(9).setFontColor(NAVY)
