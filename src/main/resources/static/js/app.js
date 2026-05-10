@@ -793,24 +793,157 @@ async function onCurriculumChange(programId, curriculumId) {
   await loadCurriculum(programId);
 }
 
+let _secStudentsAll       = [];
+let _allSections          = [];
+let _allSemestersForFilter = [];
+let _activeSemTab         = null;
+
 async function loadSections() {
   try {
-    const data = await api('/api/sections');
-    const tbody = document.getElementById('tbl-sections');
-    clearSortCache('tbl-sections');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>No sections found.</p></div></td></tr>'; return; }
-    tbody.innerHTML = data.map(s =>
-      `<tr>
-        <td>${escHtml(s.sectionId)}</td><td>${escHtml(s.sectionCode)}</td><td>${escHtml(s.sectionName)}</td>
-        <td>${escHtml(s.program?.programCode)}</td><td>${s.yearLevel}</td>
-        <td>${escHtml(s.semester?.semesterLabel || '—')}</td><td>${s.capacity}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-outline btn-sm registrar-only" onclick='openSectionModal(${JSON.stringify(s)})'>Edit</button>
-          <button class="btn btn-danger btn-sm registrar-only" onclick="deleteSection('${escHtml(s.sectionId)}')">Delete</button>
-        </td>
-      </tr>`
-    ).join('');
+    [_allSections, _allSemestersForFilter] = await Promise.all([
+      api('/api/sections'),
+      api('/api/school-years/semesters').catch(() => []),
+    ]);
+    _buildSemFilter();
+    _renderSectionsBySem(_activeSemTab);
+    // Fetch enrolled counts in parallel and update badges
+    Promise.all(_allSections.map(s =>
+      api(`/api/sections/${s.sectionId}/students`)
+        .then(ss => ({ id: s.sectionId, cap: s.capacity, count: ss.length }))
+        .catch(() => ({ id: s.sectionId, cap: s.capacity, count: '?' }))
+    )).then(counts => {
+      counts.forEach(({ id, cap, count }) => {
+        const badge = document.getElementById(`sec-badge-${id}`);
+        if (badge) {
+          badge.textContent = `${count} / ${cap}`;
+          badge.classList.toggle('sec-enroll-full', typeof count === 'number' && count >= cap);
+        }
+      });
+    });
   } catch (e) { console.error(e); }
+}
+
+function _buildSemFilter() {
+  // Use full semesters list so empty semesters also appear in the filter
+  const sems = _allSemestersForFilter.length ? _allSemestersForFilter : [];
+
+  const sel = document.getElementById('sec-sem-filter');
+  if (!sel) return;
+  sel.innerHTML = '';
+
+  if (!sems.length) return;
+
+  // Default to the active semester, or the first in the list
+  const activeSem = sems.find(s => s.isActive);
+  if (!_activeSemTab || !sems.find(s => s.semesterId === _activeSemTab))
+    _activeSemTab = activeSem?.semesterId || sems[0].semesterId;
+
+  // Group by school year label for display (newest first — sems arrive DESC by index)
+  sems.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.semesterId;
+    opt.textContent = s.semesterLabel;
+    opt.selected = s.semesterId === _activeSemTab;
+    sel.appendChild(opt);
+  });
+}
+
+function _renderSectionsBySem(semId) {
+  const wrap = document.getElementById('sec-groups-wrap');
+  const filtered = semId ? _allSections.filter(s => s.semester?.semesterId === semId) : _allSections;
+
+  if (!filtered.length) {
+    wrap.innerHTML = '<div class="empty-state"><p>No sections for this semester.</p></div>';
+    return;
+  }
+
+  // Group by year level
+  const byYear = new Map();
+  filtered.forEach(s => {
+    const y = s.yearLevel ?? 0;
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(s);
+  });
+
+  // Sort year levels ascending
+  const sortedYears = [...byYear.keys()].sort((a, b) => a - b);
+
+  wrap.innerHTML = sortedYears.map(year => {
+    const sections = byYear.get(year);
+    const rows = sections.map(s => `<tr>
+      <td>${escHtml(s.sectionId)}</td>
+      <td>${escHtml(s.sectionCode)}</td>
+      <td>${escHtml(s.sectionName)}</td>
+      <td>${escHtml(s.program?.programCode || '—')}</td>
+      <td>
+        <span id="sec-badge-${escHtml(s.sectionId)}" class="sec-enroll-badge"
+          onclick="viewSectionStudents('${escHtml(s.sectionId)}','${escHtml(s.sectionName)}',${s.capacity})"
+          title="Click to view enrolled students">— / ${s.capacity}</span>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="viewSectionStudents('${escHtml(s.sectionId)}','${escHtml(s.sectionName)}',${s.capacity})">View</button>
+        <button class="btn btn-outline btn-sm registrar-only" onclick='openSectionModal(${JSON.stringify(s)})'>Edit</button>
+        <button class="btn btn-danger btn-sm registrar-only" onclick="deleteSection('${escHtml(s.sectionId)}')">Delete</button>
+      </td>
+    </tr>`).join('');
+
+    return `
+      <div class="sec-year-group">
+        <div class="sec-year-label">Year ${year}</div>
+        <table class="data-table" style="width:100%">
+          <thead><tr>
+            <th>ID</th><th>Code</th><th>Name</th><th>Program</th><th>Enrolled</th><th>Actions</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+}
+
+async function viewSectionStudents(sectionId, sectionName, capacity) {
+  document.getElementById('sec-stu-title').textContent = sectionName;
+  document.getElementById('sec-stu-sub').textContent = `Section ID: ${sectionId}`;
+  document.getElementById('sec-stu-count-badge').textContent = '…';
+  document.getElementById('sec-stu-search').value = '';
+  document.getElementById('tbl-sec-students').innerHTML =
+    '<tr><td colspan="5" style="text-align:center;color:var(--gray-400);padding:16px">Loading…</td></tr>';
+  openModal('modal-section-students');
+  try {
+    const students = await api(`/api/sections/${sectionId}/students`);
+    _secStudentsAll = students;
+    const badge = document.getElementById('sec-stu-count-badge');
+    badge.textContent = `${students.length} / ${capacity}`;
+    badge.className = 'sec-stu-count-badge' + (students.length >= capacity ? ' sec-enroll-full' : '');
+    renderSecStudentRows(students);
+  } catch (e) {
+    document.getElementById('tbl-sec-students').innerHTML =
+      `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:16px">${escHtml(e.message)}</td></tr>`;
+  }
+}
+
+function renderSecStudentRows(list) {
+  const tbody = document.getElementById('tbl-sec-students');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No students enrolled in this section.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(s =>
+    `<tr>
+      <td>${escHtml(s.studentId)}</td>
+      <td>${escHtml(s.fullName)}</td>
+      <td>${escHtml(s.program || '—')}</td>
+      <td style="text-align:center">${s.currentYearLevel ?? '—'}</td>
+      <td>${escHtml(s.dateAssigned || '—')}</td>
+    </tr>`
+  ).join('');
+}
+
+function filterSecStudents(query) {
+  const q = query.toLowerCase();
+  const filtered = _secStudentsAll.filter(s =>
+    (s.fullName || '').toLowerCase().includes(q) || (s.studentId || '').toLowerCase().includes(q)
+  );
+  renderSecStudentRows(filtered);
 }
 
 async function loadSchedule() {

@@ -419,7 +419,10 @@ class SectionController {
             if (sectionRepository.existsBySectionNameAndSemester_SemesterId(section.getSectionName(), semId))
                 return ResponseEntity.badRequest().body(Map.of("error", "A section with that name already exists in this semester"));
         }
-        section.setSectionId("SEC-" + String.format("%04d", 1001 + sectionRepository.count()));
+        long nextId = sectionRepository.findAll().stream()
+                .map(s -> { try { return Long.parseLong(s.getSectionId().replace("SEC-", "")); } catch (Exception e) { return 0L; } })
+                .max(Long::compareTo).orElse(1000L) + 1;
+        section.setSectionId("SEC-" + String.format("%04d", nextId));
         if (section.getProgram() == null || section.getProgram().getProgramId() == null)
             return ResponseEntity.badRequest().body(Map.of("error", "Program is required."));
         Program resolvedProg = programRepository.findByProgramId(section.getProgram().getProgramId()).orElse(null);
@@ -451,6 +454,12 @@ class SectionController {
             if (sectionRepository.existsBySectionNameAndSemester_SemesterIdAndSectionIdNot(section.getSectionName(), semId, id))
                 return ResponseEntity.badRequest().body(Map.of("error", "A section with that name already exists in this semester"));
         }
+        if (section.getCapacity() != null) {
+            long enrolled = studentSectionRepository.findBySection_SectionId(id).size();
+            if (section.getCapacity() < enrolled)
+                return ResponseEntity.badRequest().body(Map.of("error",
+                    "Cannot set capacity to " + section.getCapacity() + " — section already has " + enrolled + " student(s) enrolled."));
+        }
         existing.setSectionCode(section.getSectionCode());
         existing.setSectionName(section.getSectionName());
         existing.setYearLevel(section.getYearLevel());
@@ -478,6 +487,28 @@ class SectionController {
                 "Cannot delete — students are currently assigned to this section. Remove their section assignments first."));
         sectionRepository.delete(existing);
         return ResponseEntity.noContent().build();
+    }
+
+    // LAYER 1 → LAYER 2: Triggered by app.js viewSectionStudents() to list enrolled students in a section
+    // LAYER 2 → LAYER 4: Fetches all StudentSection records for the section, maps to a flat student summary
+    // LAYER 2 → LAYER 1: Returns a JSON array of { studentId, fullName, currentYearLevel, program, dateAssigned }
+    @GetMapping("/{id}/students")
+    @PreAuthorize("hasAnyRole('Registrar','Admin')")
+    public ResponseEntity<?> getStudents(@PathVariable String id) {
+        Section section = sectionRepository.findBySectionId(id).orElse(null);
+        if (section == null) return ResponseEntity.notFound().build();
+        List<StudentSection> assignments = studentSectionRepository.findBySection_SectionId(id);
+        List<java.util.Map<String, Object>> result = assignments.stream().map(ss -> {
+            Student st = ss.getStudent();
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("studentId",        st.getStudentId());
+            m.put("fullName",         st.getFullName());
+            m.put("currentYearLevel", st.getCurrentYearLevel());
+            m.put("program",          st.getProgram() != null ? st.getProgram().getProgramCode() : "—");
+            m.put("dateAssigned",     ss.getDateAssigned());
+            return m;
+        }).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadInstructors() and schedule modal dropdowns

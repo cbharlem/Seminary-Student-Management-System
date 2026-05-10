@@ -475,8 +475,15 @@
     <div><h2>Sections</h2><p>Class sections per semester</p></div>
     <button class="btn btn-primary registrar-only" onclick="openSectionModal(null)">+ Add Section</button>
   </div>
-  <div class="card"><div class="card-header"><h3>All Sections</h3></div>
-    <div class="card-body"><table><thead><tr><th>ID</th><th class="sortable" onclick="sortTable('tbl-sections',1,this)">Code</th><th class="sortable" onclick="sortTable('tbl-sections',2,this)">Name</th><th class="sortable" onclick="sortTable('tbl-sections',3,this)">Program</th><th class="sortable" onclick="sortTable('tbl-sections',4,this)">Year</th><th>Semester</th><th class="sortable" onclick="sortTable('tbl-sections',6,this)">Capacity</th><th>Actions</th></tr></thead><tbody id="tbl-sections"></tbody></table></div>
+  <div class="card">
+    <div class="card-header">
+      <h3>All Sections</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label for="sec-sem-filter" style="font-size:.8rem;color:var(--gray-500);white-space:nowrap">Semester</label>
+        <select id="sec-sem-filter" class="form-select" onchange="_activeSemTab=this.value;_renderSectionsBySem(this.value)"></select>
+      </div>
+    </div>
+    <div class="card-body" id="sec-groups-wrap"></div>
   </div>
 </div>
 
@@ -1202,6 +1209,32 @@
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-section-delete')">Cancel</button>
       <button class="btn btn-danger registrar-only" onclick="confirmDeleteSection()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Section Students -->
+<div class="modal-overlay" id="modal-section-students">
+  <div class="modal" style="max-width:700px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
+      <div>
+        <h3 id="sec-stu-title" style="margin:0">Enrolled Students</h3>
+        <p class="modal-sub" id="sec-stu-sub" style="margin:4px 0 0"></p>
+      </div>
+      <span id="sec-stu-count-badge" class="sec-stu-count-badge"></span>
+    </div>
+    <div style="margin-top:10px">
+      <input type="text" id="sec-stu-search" class="search-input" placeholder="Search by name or student ID…"
+        oninput="filterSecStudents(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:10px"/>
+      <table class="data-table" style="width:100%">
+        <thead><tr>
+          <th>Student ID</th><th>Full Name</th><th>Program</th><th>Year Level</th><th>Date Assigned</th>
+        </tr></thead>
+        <tbody id="tbl-sec-students"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-section-students')">Close</button>
     </div>
   </div>
 </div>
