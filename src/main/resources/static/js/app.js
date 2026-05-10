@@ -1709,7 +1709,9 @@ async function saveStudent() {
       await api(`/api/students/${id}`, 'PUT', payload);
       toast('Student record updated');
       closeStudentModal();
+      loadStudents();
       viewStudent(id);
+      _gradeStudents = []; // invalidate grade search cache so updated name is picked up
     } else {
       await api('/api/students', 'POST', payload);
       toast('Student record saved');
