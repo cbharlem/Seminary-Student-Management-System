@@ -272,7 +272,6 @@
 <div id="page-applicants" class="page">
   <div class="page-header">
     <div><h2>Applicants</h2><p>Manage the admissions pipeline</p></div>
-    <button class="btn btn-primary registrar-only" onclick="['ap-fname','ap-lname','ap-mname','ap-dob','ap-pob','ap-email','ap-contact','ap-nationality','ap-address','ap-father','ap-father-occ','ap-mother','ap-mother-occ','ap-guardian','ap-guardian-contact','ap-school','ap-school-year','ap-year-level'].forEach(id=>{document.getElementById(id).value=''}); openModal('modal-applicant')">+ Add Applicant</button>
   </div>
   <div class="pipeline" id="pipeline-display">
     <div class="pipe-step"><div class="pipe-dot done" id="pc-applied">0</div><div class="pipe-label">Applied</div></div>
@@ -335,7 +334,6 @@
 <div id="page-students" class="page">
   <div class="page-header">
     <div><h2>Student Records</h2><p>Permanent retention — records are never deleted</p></div>
-    <button class="btn btn-primary registrar-only" onclick="openAddStudentModal()">+ Add Student</button>
   </div>
   <div class="card">
     <div class="card-header"><h3>All Students</h3>
@@ -1525,7 +1523,6 @@
           <option value="Interviewed">Interviewed</option>
           <option value="AspiringConventionAttended">Convention Attended</option>
           <option value="Admitted">Admitted</option>
-          <option value="Enrolled">Enrolled</option>
           <option value="Rejected">Rejected</option>
           <option value="Withdrawn">Withdrawn</option>
         </select>
