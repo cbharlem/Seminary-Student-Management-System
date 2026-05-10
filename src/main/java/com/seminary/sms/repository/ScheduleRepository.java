@@ -92,6 +92,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     // Checks if an instructor has any assigned schedules — used to block deletion
     boolean existsByInstructor_InstructorId(String instructorId);
 
+    // Checks if a room has any assigned schedules — used to block deletion
+    boolean existsByRoom_RoomId(String roomId);
+
     // Returns all schedules for an instructor by business ID — used to list conflicts on delete attempt
     List<Schedule> findByInstructor_InstructorId(String instructorId);
 

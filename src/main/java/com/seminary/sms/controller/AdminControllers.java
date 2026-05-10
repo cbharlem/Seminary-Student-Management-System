@@ -575,15 +575,18 @@ class SectionController {
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteRoom() when the registrar confirms deletion
-    // LAYER 2 → LAYER 4: Soft-deletes by setting isActive = false (record is kept, hidden from lists)
+    // LAYER 2 → LAYER 4: Blocks deletion if schedules reference this room, otherwise soft-deletes
     @DeleteMapping("/rooms/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Void> deleteRoom(@PathVariable String id) {
-        return roomRepository.findByRoomId(id).map(existing -> {
-            existing.setIsActive(false);
-            roomRepository.save(existing);
-            return ResponseEntity.ok().<Void>build();
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> deleteRoom(@PathVariable String id) {
+        Room existing = roomRepository.findByRoomId(id).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
+        if (scheduleRepository.existsByRoom_RoomId(id))
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot delete — this room has existing schedule entries. Remove the schedules first."));
+        existing.setIsActive(false);
+        roomRepository.save(existing);
+        return ResponseEntity.noContent().build();
     }
 }
 
