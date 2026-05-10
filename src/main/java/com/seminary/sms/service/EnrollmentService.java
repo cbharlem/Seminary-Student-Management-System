@@ -115,6 +115,14 @@ public class EnrollmentService {
                 ". Cannot re-enroll in the same year and semester.");
         }
 
+        // Capacity check must happen before any saves so nothing is committed on failure
+        if (section != null) {
+            long enrolled = studentSectionRepository.findBySection_Index(section.getIndex()).size();
+            if (enrolled >= section.getCapacity()) {
+                throw new RuntimeException("Section " + section.getSectionCode() + " is full (" + section.getCapacity() + "/" + section.getCapacity() + " students). Choose a different section.");
+            }
+        }
+
         String enrollmentId = "ENR-" + String.format("%03d", 1 + enrollmentRepository.count());
         Enrollment enrollment = Enrollment.builder()
             .enrollmentId(enrollmentId)
@@ -133,10 +141,6 @@ public class EnrollmentService {
 
         // Assign section
         if (section != null) {
-            long enrolled = studentSectionRepository.findBySection_Index(section.getIndex()).size();
-            if (enrolled >= section.getCapacity()) {
-                throw new RuntimeException("Section " + section.getSectionCode() + " is already full (" + section.getCapacity() + "/" + section.getCapacity() + " students).");
-            }
             StudentSection ss = StudentSection.builder()
                 .studentSectionId("SS-" + String.format("%03d", 1 + studentSectionRepository.count()))
                 .student(student)

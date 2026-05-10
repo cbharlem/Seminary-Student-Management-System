@@ -212,10 +212,6 @@ class EnrollmentController {
                     }
                 }
 
-                // Mark application as Enrolled
-                application.setApplicationStatus(Application.ApplicationStatus.Enrolled);
-                applicationRepository.save(application);
-
                 // Send credentials email asynchronously (fire-and-forget — does not block response)
                 boolean emailSent = applicant.getEmail() != null && !applicant.getEmail().isBlank();
                 if (emailSent) {
@@ -225,8 +221,12 @@ class EnrollmentController {
                     );
                 }
 
-                // Save enrollment
+                // Save enrollment — capacity check happens here; if it throws, status is not marked Enrolled
                 Enrollment enrolled = enrollmentService.enroll(student, program, semester, section, yearLevel);
+
+                // Mark application as Enrolled only after enrollment succeeds
+                application.setApplicationStatus(Application.ApplicationStatus.Enrolled);
+                applicationRepository.save(application);
                 auditService.log("CREATE", "Student", "First enrollment: created student " + studentId + " from applicant " + applicantId);
                 auditService.log("CREATE", "Enrollment", "Enrolled student " + studentId + " in semester " + semester.getSemesterId());
 
