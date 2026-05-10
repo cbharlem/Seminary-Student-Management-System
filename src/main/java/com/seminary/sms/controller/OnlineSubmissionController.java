@@ -20,8 +20,10 @@ package com.seminary.sms.controller;
 // LAYER 2 → LAYER 1: ResponseEntity wraps results; Spring auto-converts to JSON.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import com.seminary.sms.config.IpRateLimitService;
 import com.seminary.sms.entity.*;
 import com.seminary.sms.repository.*;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -47,6 +49,7 @@ class PublicSubmissionController {
 
     private final ProgramRepository programRepository;
     private final OnlineSubmissionRepository submissionRepository;
+    private final IpRateLimitService ipRateLimitService;
 
     /**
      * Returns the list of active programs for the apply.html program dropdown.
@@ -73,6 +76,7 @@ class PublicSubmissionController {
      */
     @PostMapping(value = "/api/public/apply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitApplication(
+            HttpServletRequest request,
             @RequestParam String firstName,
             @RequestParam String lastName,
             @RequestParam(required = false) String middleName,
@@ -100,6 +104,13 @@ class PublicSubmissionController {
             @RequestParam MultipartFile confirmationCertificate,
             @RequestParam MultipartFile reportCard,
             @RequestParam MultipartFile goodMoral) {
+
+        // SECURITY (A04): Rate limit by IP — max 3 submissions per hour per IP
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
+        if (!ipRateLimitService.isAllowed(ip))
+            return ResponseEntity.status(429).body(Map.of("error",
+                "Too many submissions from your network. Please try again later."));
 
         // ── Required field validation ─────────────────────────────────────────
         if (isBlank(firstName))      return bad("First name is required.");
