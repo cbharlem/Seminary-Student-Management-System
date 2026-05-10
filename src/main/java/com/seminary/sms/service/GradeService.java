@@ -94,7 +94,7 @@ public class GradeService {
     public Grade saveGrade(Grade grade, User enteredBy) {
         if (grade.getGradeId() == null) grade.setGradeId("GRD-" + System.currentTimeMillis());
         grade.setEnteredBy(enteredBy);
-        grade.setDateEntered(LocalDateTime.now());
+        if (grade.getDateEntered() == null) grade.setDateEntered(LocalDateTime.now());
         grade.computeFinalRating();
         Grade saved = gradeRepository.save(grade);
 
