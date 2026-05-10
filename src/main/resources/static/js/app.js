@@ -2798,6 +2798,38 @@ async function saveExam() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+let _rptStudents = [];
+
+function renderRptStudentOptions(query) {
+  const list = document.getElementById('gen-report-student-list');
+  if (!list) return;
+  const q = (query || '').toLowerCase();
+  const filtered = _rptStudents.filter(s =>
+    `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q)
+  );
+  list.innerHTML = '';
+  if (!filtered.length) {
+    list.innerHTML = '<div class="enr-student-option no-match">No students found</div>';
+    return;
+  }
+  filtered.forEach(s => {
+    const label = `${s.firstName} ${s.lastName} (${s.studentId})`;
+    const item = document.createElement('div');
+    item.className = 'enr-student-option';
+    item.textContent = label;
+    item.setAttribute('role', 'option');
+    item.addEventListener('mousedown', e => {
+      e.preventDefault();
+      document.getElementById('gen-report-student').value = s.studentId;
+      document.getElementById('gen-report-student-search').value = label;
+      closeRptStudentDropdown();
+    });
+    list.appendChild(item);
+  });
+}
+function openRptStudentDropdown()  { document.getElementById('gen-report-student-list').classList.add('open'); }
+function closeRptStudentDropdown() { document.getElementById('gen-report-student-list').classList.remove('open'); }
+
 function openReportModal(type) {
   _currentReportType = type;
 
@@ -2820,10 +2852,15 @@ function openReportModal(type) {
   document.getElementById('gen-report-student-wrap').style.display = showStudent  ? '' : 'none';
   document.getElementById('gen-report-sem-wrap').style.display     = showSemester ? '' : 'none';
 
+  // Reset student search field
+  document.getElementById('gen-report-student-search').value = '';
+  document.getElementById('gen-report-student').value = '';
+
   if (showStudent) {
+    _rptStudents = [];
     api('/api/students').then(students => {
-      populateSelect('gen-report-student', students, 'studentId',
-        s => `${s.firstName} ${s.lastName} (${s.studentId})`, '— Select Student —');
+      _rptStudents = students;
+      renderRptStudentOptions('');
     }).catch(_=>{});
   }
   if (showSemester) {

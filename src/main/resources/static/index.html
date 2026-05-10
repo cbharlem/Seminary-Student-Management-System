@@ -1433,7 +1433,17 @@
   <div class="modal">
     <h3 id="gen-report-title">Generate Report</h3><p class="modal-sub" id="gen-report-sub"></p>
     <div class="modal-grid">
-      <div class="field full" id="gen-report-student-wrap"><label for="gen-report-student">Student <span style="color:var(--danger)">*</span></label><select id="gen-report-student"></select></div>
+      <div class="field full" id="gen-report-student-wrap">
+        <label for="gen-report-student-search">Student <span style="color:var(--danger)">*</span></label>
+        <div class="enr-student-wrap">
+          <input type="text" id="gen-report-student-search" placeholder="Search by name or student ID…" autocomplete="off"
+            oninput="renderRptStudentOptions(this.value); openRptStudentDropdown()"
+            onfocus="renderRptStudentOptions(this.value); openRptStudentDropdown()"
+            onblur="closeRptStudentDropdown()"/>
+          <input type="hidden" id="gen-report-student"/>
+          <div id="gen-report-student-list" class="enr-student-list" role="listbox"></div>
+        </div>
+      </div>
       <div class="field full" id="gen-report-sem-wrap"><label for="gen-report-sem">Semester <span style="color:var(--danger)">*</span></label><select id="gen-report-sem"></select></div>
     </div>
     <div class="modal-actions">
