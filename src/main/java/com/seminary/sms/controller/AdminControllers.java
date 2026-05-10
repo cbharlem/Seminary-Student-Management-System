@@ -65,6 +65,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -889,6 +890,15 @@ class SchoolYearController {
         LocalDate endDate   = LocalDate.parse((String) body.get("endDate"));
         if (!endDate.isAfter(startDate))
             return ResponseEntity.badRequest().body(Map.of("error", "End date must be after start date"));
+        String[] syYears = sy.getYearLabel().split("-");
+        int syStartYear = Integer.parseInt(syYears[0]);
+        int syEndYear   = Integer.parseInt(syYears[1]);
+        if (startDate.getYear() < syStartYear || startDate.getYear() > syEndYear)
+            return ResponseEntity.badRequest().body(Map.of("error", "Start date must fall within the school year " + sy.getYearLabel()));
+        if (endDate.getYear() < syStartYear || endDate.getYear() > syEndYear)
+            return ResponseEntity.badRequest().body(Map.of("error", "End date must fall within the school year " + sy.getYearLabel()));
+        if (ChronoUnit.DAYS.between(startDate, endDate) < 30)
+            return ResponseEntity.badRequest().body(Map.of("error", "Semester must span at least 30 days"));
         boolean duplicate = semesterRepository.existsBySchoolYear_SchoolYearIdAndSemesterNumber(
             schoolYearId, Integer.parseInt(body.get("semesterNumber").toString()));
         if (duplicate)
@@ -911,6 +921,15 @@ class SchoolYearController {
         LocalDate updEnd   = body.containsKey("endDate")   ? LocalDate.parse((String) body.get("endDate"))   : sem.getEndDate();
         if (!updEnd.isAfter(updStart))
             return ResponseEntity.badRequest().body(Map.of("error", "End date must be after start date"));
+        String[] syYearsU = sem.getSchoolYear().getYearLabel().split("-");
+        int syStartYearU = Integer.parseInt(syYearsU[0]);
+        int syEndYearU   = Integer.parseInt(syYearsU[1]);
+        if (updStart.getYear() < syStartYearU || updStart.getYear() > syEndYearU)
+            return ResponseEntity.badRequest().body(Map.of("error", "Start date must fall within the school year " + sem.getSchoolYear().getYearLabel()));
+        if (updEnd.getYear() < syStartYearU || updEnd.getYear() > syEndYearU)
+            return ResponseEntity.badRequest().body(Map.of("error", "End date must fall within the school year " + sem.getSchoolYear().getYearLabel()));
+        if (ChronoUnit.DAYS.between(updStart, updEnd) < 30)
+            return ResponseEntity.badRequest().body(Map.of("error", "Semester must span at least 30 days"));
         sem.setStartDate(updStart);
         sem.setEndDate(updEnd);
         return ResponseEntity.ok(semesterRepository.save(sem));

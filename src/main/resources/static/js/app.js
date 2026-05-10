@@ -2751,6 +2751,20 @@ async function saveSchoolYear() {
 
   if (startDate >= endDate) { toast('End date must be after start date', 'error'); return; }
 
+  const parts = yearLabel.match(/^(\d{4})-(\d{4})$/);
+  if (!parts) { toast('Year Label must be in format e.g. 2026-2027', 'error'); return; }
+  const syStartYear = parseInt(parts[1]);
+  const syEndYear   = parseInt(parts[2]);
+  const startYear   = new Date(startDate).getFullYear();
+  const endYear     = new Date(endDate).getFullYear();
+  if (startYear < syStartYear || startYear > syEndYear)
+    { toast(`Start date must fall within the school year ${yearLabel}`, 'error'); return; }
+  if (endYear < syStartYear || endYear > syEndYear)
+    { toast(`End date must fall within the school year ${yearLabel}`, 'error'); return; }
+
+  const diffDays = (new Date(endDate) - new Date(startDate)) / 86400000;
+  if (diffDays < 30) { toast('Semester must span at least 30 days', 'error'); return; }
+
   // Auto-generate semester label from year + semester number
   const semNumNames = { '1': 'First', '2': 'Second', '3': 'Summer' };
   const semLabel = semNum === '3'
@@ -2764,8 +2778,6 @@ async function saveSchoolYear() {
       });
       toast('Semester updated');
     } else {
-      const parts = yearLabel.match(/(\d{4})-(\d{4})/);
-      if (!parts) { toast('Year Label must be in format e.g. 2026-2027', 'error'); return; }
       const syId  = 'SY-' + parts[1].slice(2) + parts[2].slice(2);
       try { await api('/api/school-years', 'POST', { schoolYearId: syId, yearLabel }); } catch (_) {}
       const semId = 'SEM-' + syId.replace(/^SY-/i, '') + '-' + semNum;
