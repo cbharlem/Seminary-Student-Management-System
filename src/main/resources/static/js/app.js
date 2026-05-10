@@ -1226,14 +1226,16 @@ function filterGradeStudents(query) {
   }
 
   // tabindex + onkeydown on each item for keyboard navigation (WCAG 2.1, ISO 9241-171)
-  sugEl.innerHTML = matches.map(s =>
-    `<div class="grade-sug-item" tabindex="0"
-      onmousedown="selectGradeStudent('${escHtml(s.studentId)}','${escHtml(s.firstName + ' ' + s.lastName)}')"
-      onkeydown="onGradeSugKeydown(event,this,'${escHtml(s.studentId)}','${escHtml(s.firstName + ' ' + s.lastName)}')">
-      <span class="grade-sug-name">${escHtml(s.firstName)} ${escHtml(s.lastName)}</span>
+  sugEl.innerHTML = matches.map(s => {
+    const display = `${escHtml(s.lastName)}, ${escHtml(s.firstName)}`;
+    const fullName = `${s.lastName}, ${s.firstName}`;
+    return `<div class="grade-sug-item" tabindex="0"
+      onmousedown="selectGradeStudent('${escHtml(s.studentId)}','${escHtml(fullName)}')"
+      onkeydown="onGradeSugKeydown(event,this,'${escHtml(s.studentId)}','${escHtml(fullName)}')">
+      <span class="grade-sug-name">${display}</span>
       <span class="grade-sug-id">${escHtml(s.studentId)}</span>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
   sugEl.classList.add('open');
 }
 
@@ -1687,7 +1689,6 @@ async function changeMyUsername() {
     const result = await api('/api/me/username', 'PATCH', { username: newUsername });
     toast(result.message || 'Username updated');
     document.getElementById('settings-username').value = '';
-    // Update header display; full effect requires re-login
     document.getElementById('hdr-name').textContent = newUsername;
   } catch (e) { toast(e.message, 'error'); }
 }

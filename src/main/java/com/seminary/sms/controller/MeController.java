@@ -27,11 +27,17 @@ package com.seminary.sms.controller;
 
 import com.seminary.sms.repository.UserRepository;
 import com.seminary.sms.service.AuditService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -133,7 +139,9 @@ public class MeController {
     // ── Change Username ───────────────────────────────────────────
     @PatchMapping("/me/username")
     public ResponseEntity<?> changeUsername(Authentication auth,
-                                            @RequestBody Map<String, String> body) {
+                                            @RequestBody Map<String, String> body,
+                                            HttpServletRequest request,
+                                            HttpServletResponse response) {
         String newUsername = body.get("username");
         if (newUsername == null || newUsername.isBlank())
             return ResponseEntity.badRequest().body(Map.of("error", "Username cannot be empty."));
@@ -148,10 +156,18 @@ public class MeController {
             .map(user -> {
                 user.setUsername(newUsername);
                 userRepository.save(user);
-                // Session still uses old username — user must re-login for it to take effect
-                return ResponseEntity.ok(Map.of(
-                    "message", "Username updated. Please log out and log back in.",
-                    "newUsername", newUsername));
+
+                // Update the session's security context so subsequent requests resolve
+                // the new username — without this, auth.getName() stays as the old
+                // username and the next request returns 401
+                UsernamePasswordAuthenticationToken newAuth =
+                    new UsernamePasswordAuthenticationToken(newUsername, auth.getCredentials(), auth.getAuthorities());
+                SecurityContext newCtx = SecurityContextHolder.createEmptyContext();
+                newCtx.setAuthentication(newAuth);
+                SecurityContextHolder.setContext(newCtx);
+                new HttpSessionSecurityContextRepository().saveContext(newCtx, request, response);
+
+                return ResponseEntity.ok(Map.of("message", "Username updated.", "newUsername", newUsername));
             })
             .orElse(ResponseEntity.status(401).body(Map.of("error", "User not found")));
     }
