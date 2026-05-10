@@ -52,8 +52,6 @@ public class Section {
 
     @Builder.Default
     @Column(name = "fldCapacity", columnDefinition = "TINYINT") private Integer capacity = 40;
-    @Builder.Default
-    @Column(name = "fldIsActive", nullable = false, columnDefinition = "TINYINT") private Boolean isActive = true;
 
     @Column(name = "fldCreatedAt", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "fldUpdatedAt", nullable = false)                    private LocalDateTime updatedAt;

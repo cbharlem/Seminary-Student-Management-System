@@ -38,7 +38,7 @@ public interface SectionRepository extends JpaRepository<Section, Integer> {
     // Called by: lookups that filter sections by program (by PK) for enrollment assignment
     List<Section> findByProgram_Index(Integer programIndex);
 
-    // Duplicate guards — checks if a section code or name already exists in the same semester
+    // Duplicate guards — checks against all sections (sections are hard-deleted so no inactive rows exist)
     boolean existsBySectionCodeAndSemester_SemesterId(String sectionCode, String semesterId);
     boolean existsBySectionNameAndSemester_SemesterId(String sectionName, String semesterId);
     boolean existsBySectionCodeAndSemester_SemesterIdAndSectionIdNot(String sectionCode, String semesterId, String sectionId);

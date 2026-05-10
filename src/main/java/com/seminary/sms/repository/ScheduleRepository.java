@@ -42,6 +42,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     // Auto-generates: JOIN tblsection ON ... WHERE tblsection.fldSectionID = ?
     // Called by: ScheduleController.getBySection() to list all schedule slots for a given section
     List<Schedule> findBySection_SectionId(String sectionId);
+    boolean existsBySection_SectionId(String sectionId);
 
     // Auto-generates: JOIN tblinstructors ON ... WHERE tblinstructors.fldIndex = ?
     // Called by: ScheduleService to retrieve all schedules assigned to an instructor (by PK)

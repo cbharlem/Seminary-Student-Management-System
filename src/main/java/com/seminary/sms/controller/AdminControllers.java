@@ -394,6 +394,7 @@ class SectionController {
     private final ProgramRepository programRepository;
     private final SemesterRepository semesterRepository;
     private final ScheduleRepository scheduleRepository;
+    private final StudentSectionRepository studentSectionRepository;
 
     // LAYER 1 → LAYER 2: Triggered by app.js loadSections() and dropdowns needing available sections
     // LAYER 2 → LAYER 4: Calls sectionRepository filtered by semester if provided; filters to active only
@@ -401,9 +402,8 @@ class SectionController {
     @GetMapping
     @PreAuthorize("hasAnyRole('Registrar','Admin','Student')")
     public List<Section> getSections(@RequestParam(required = false) String semester) {
-        if (semester != null) return sectionRepository.findBySemester_SemesterId(semester, Sort.by(Sort.Direction.DESC, "index"))
-            .stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
-        return sectionRepository.findAll(Sort.by(Sort.Direction.DESC, "index")).stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).toList();
+        if (semester != null) return sectionRepository.findBySemester_SemesterId(semester, Sort.by(Sort.Direction.DESC, "index"));
+        return sectionRepository.findAll(Sort.by(Sort.Direction.DESC, "index"));
     }
 
     // LAYER 1 → LAYER 2: Triggered by app.js saveSection() when adding a new section
@@ -462,16 +462,21 @@ class SectionController {
         return ResponseEntity.ok(sectionRepository.save(existing));
     }
 
-    // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteSection() when a section is soft-deleted
-    // LAYER 2 → LAYER 4: Sets isActive = false (soft delete — data is kept, just hidden from lists)
-    // LAYER 2 → LAYER 1: Returns HTTP 204 No Content on success
+    // LAYER 1 → LAYER 2: Triggered by app.js confirmDeleteSection() when a section is deleted
+    // LAYER 2 → LAYER 4: Hard-deletes the section after verifying no schedules reference it
+    // LAYER 2 → LAYER 1: Returns HTTP 204 on success, or 409 if schedules exist
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Registrar')")
-    public ResponseEntity<Void> delete(@PathVariable String id) {
+    public ResponseEntity<?> delete(@PathVariable String id) {
         Section existing = sectionRepository.findBySectionId(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
-        existing.setIsActive(false);
-        sectionRepository.save(existing);
+        if (scheduleRepository.existsBySection_SectionId(id))
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot delete — this section has existing schedule entries. Remove the schedules first."));
+        if (studentSectionRepository.existsBySection_SectionId(id))
+            return ResponseEntity.status(409).body(Map.of("error",
+                "Cannot delete — students are currently assigned to this section. Remove their section assignments first."));
+        sectionRepository.delete(existing);
         return ResponseEntity.noContent().build();
     }
 

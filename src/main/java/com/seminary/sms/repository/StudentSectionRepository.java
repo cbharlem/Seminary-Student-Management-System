@@ -36,4 +36,8 @@ public interface StudentSectionRepository extends JpaRepository<StudentSection, 
     // Auto-generates: JOIN tblsection ON ... WHERE tblsection.fldIndex = ?
     // Called by: SectionController to list all students currently assigned to a section
     List<StudentSection> findBySection_Index(Integer sectionIndex);
+
+    // Auto-generates: SELECT COUNT(*) > 0 ... JOIN tblsection WHERE tblsection.fldSectionID = ?
+    // Called by: SectionController.delete() to block deletion if students are still assigned
+    boolean existsBySection_SectionId(String sectionId);
 }
