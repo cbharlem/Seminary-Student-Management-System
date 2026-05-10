@@ -2834,7 +2834,10 @@ function openReportModal(type) {
   openModal('modal-gen-report');
 }
 
-function generateReport() {
+let _reportBlobUrl = null;
+let _reportFilename = 'report.pdf';
+
+async function generateReport() {
   const type       = _currentReportType;
   const studentId  = document.getElementById('gen-report-student').value;
   const semesterId = document.getElementById('gen-report-sem').value;
@@ -2843,18 +2846,64 @@ function generateReport() {
   if (type === 'GradeCard') {
     if (!studentId || !semesterId) { toast('Please select a student and a semester.', 'error'); return; }
     url = `/api/reports/grade-card?studentId=${encodeURIComponent(studentId)}&semesterId=${encodeURIComponent(semesterId)}`;
+    _reportFilename = `grade-card-${studentId}.pdf`;
   } else if (type === 'TranscriptOfRecords') {
     if (!studentId) { toast('Please select a student.', 'error'); return; }
     url = `/api/reports/transcript?studentId=${encodeURIComponent(studentId)}`;
+    _reportFilename = `transcript-${studentId}.pdf`;
   } else if (type === 'CHEDReport') {
     if (!semesterId) { toast('Please select a semester.', 'error'); return; }
     url = `/api/reports/ched-report?semesterId=${encodeURIComponent(semesterId)}`;
+    _reportFilename = `ched-report-${semesterId}.pdf`;
   } else {
     toast('Unknown report type.', 'error'); return;
   }
 
   closeModal('modal-gen-report');
-  window.open(url, '_blank');
+
+  // Show preview modal in loading state
+  const titles = { GradeCard: 'Grade Card', TranscriptOfRecords: 'Transcript of Records', CHEDReport: 'CHED Compliance Report' };
+  document.getElementById('report-preview-title').textContent = titles[type] || type;
+  document.getElementById('report-preview-sub').textContent = 'Generating PDF — please wait…';
+  document.getElementById('report-preview-loading').style.display = 'flex';
+  document.getElementById('report-preview-iframe').style.display = 'none';
+  document.getElementById('btn-report-download').disabled = true;
+  if (_reportBlobUrl) { URL.revokeObjectURL(_reportBlobUrl); _reportBlobUrl = null; }
+  openModal('modal-report-preview');
+
+  try {
+    const resp = await fetch(url, { credentials: 'include' });
+    if (!resp.ok) {
+      const msg = await resp.text().catch(() => 'Unknown error');
+      throw new Error(msg || `HTTP ${resp.status}`);
+    }
+    const blob = await resp.blob();
+    _reportBlobUrl = URL.createObjectURL(blob);
+
+    // #navpanes=0 hides the thumbnail sidebar in Chrome's PDF viewer, giving full width to content
+    document.getElementById('report-preview-iframe').src = _reportBlobUrl + '#navpanes=0';
+    document.getElementById('report-preview-loading').style.display = 'none';
+    document.getElementById('report-preview-iframe').style.display = 'block';
+    document.getElementById('report-preview-sub').textContent = 'Review the report below. Click Download PDF to save it.';
+    document.getElementById('btn-report-download').disabled = false;
+  } catch (e) {
+    closeModal('modal-report-preview');
+    toast('Failed to generate report: ' + e.message, 'error');
+  }
+}
+
+function downloadReport() {
+  if (!_reportBlobUrl) return;
+  const a = document.createElement('a');
+  a.href = _reportBlobUrl;
+  a.download = _reportFilename;
+  a.click();
+}
+
+function closeReportPreview() {
+  closeModal('modal-report-preview');
+  if (_reportBlobUrl) { URL.revokeObjectURL(_reportBlobUrl); _reportBlobUrl = null; }
+  document.getElementById('report-preview-iframe').src = 'about:blank';
 }
 
 function triggerBackup() {
