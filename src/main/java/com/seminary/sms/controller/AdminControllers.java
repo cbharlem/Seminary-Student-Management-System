@@ -739,6 +739,9 @@ class UserController {
         if (userRepository.existsByUsername(body.get("username"))) {
             return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
         }
+        String roleStr = body.get("role");
+        if (!"Registrar".equals(roleStr))
+            return ResponseEntity.badRequest().body(Map.of("error", "Only Registrar accounts can be created here. Student accounts are created automatically on enrollment."));
         try {
             String email = body.get("email");
             User user = User.builder()
@@ -746,7 +749,7 @@ class UserController {
                 .username(body.get("username"))
                 .passwordHash(passwordEncoder.encode(body.get("password")))
                 // SECURITY (A08): Enum poisoning — wrap valueOf to return 400 on invalid role
-                .role(User.Role.valueOf(body.get("role")))
+                .role(User.Role.valueOf(roleStr))
                 .email(email != null && !email.isBlank() ? email.trim() : null)
                 .isActive(true)
                 .build();
