@@ -948,7 +948,8 @@ function filterSecStudents(query) {
 
 async function loadSchedule() {
   try {
-    const sections = await api('/api/sections');
+    const activeSemId = SMS.activeSemester?.semesterId || '';
+    const sections = await api(`/api/sections?semester=${activeSemId}`);
     const sel = document.getElementById('sched-section-filter');
     sel.innerHTML = '<option value="">Select section…</option>' +
       sections.map(s => `<option value="${s.sectionId}">${s.sectionName}</option>`).join('');
@@ -2025,9 +2026,10 @@ async function openEnrollModal() {
   const semLabel = document.getElementById('enr-active-sem-label');
   if (semLabel) semLabel.textContent = SMS.activeSemester?.semesterLabel || '—';
 
-  // Load all sections once; filtering by year level is done client-side
+  // Load sections for the active semester only; filtering by year level is done client-side
   try {
-    _allEnrSections = await api('/api/sections');
+    const activeSemId = SMS.activeSemester?.semesterId || '';
+    _allEnrSections = await api(`/api/sections?semester=${activeSemId}`);
     filterEnrSections('app');
     filterEnrSections('std');
   } catch (_) {}
@@ -2470,8 +2472,9 @@ function closeSchedModal() {
 }
 
 async function _populateSchedSelects() {
+  const activeSemId = SMS.activeSemester?.semesterId || '';
   const [sections, courses, instructors, rooms] = await Promise.all([
-    api('/api/sections'), api('/api/curriculum/courses'),
+    api(`/api/sections?semester=${activeSemId}`), api('/api/curriculum/courses'),
     api('/api/sections/instructors'), api('/api/sections/rooms')
   ]);
   populateSelect('sch-section',    sections,    'sectionId',    s => s.sectionName, 'Select…');
