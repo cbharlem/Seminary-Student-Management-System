@@ -781,6 +781,8 @@ body.admin-view .registrar-only { display: none !important; }
 .sec-enroll-badge.sec-enroll-full { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
 .sec-enroll-badge.sec-enroll-full:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
 
+.sy-tag { font-size: .68rem; color: var(--gray-500); font-weight: 400; margin-left: 5px; white-space: nowrap; }
+
 .sec-stu-count-badge {
   display: inline-block; padding: 4px 14px; border-radius: 20px;
   background: var(--gray-100); color: var(--navy); font-size: .82rem; font-weight: 700;

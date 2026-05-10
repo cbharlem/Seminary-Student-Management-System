@@ -53,14 +53,15 @@ public class ScheduleService {
     // Returns a list of conflict messages — empty list means no conflicts
     public List<String> detectConflicts(Schedule candidate, String excludeScheduleId) {
         List<String> conflicts = new ArrayList<>();
+        String semId = candidate.getSection().getSemester().getSemesterId();
 
         if (candidate.getRoom() != null) {
             List<Schedule> roomConflicts = (excludeScheduleId != null)
                 ? scheduleRepository.findConflictsByRoomExcluding(
-                    candidate.getRoom().getRoomId(), excludeScheduleId,
+                    candidate.getRoom().getRoomId(), semId, excludeScheduleId,
                     candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd())
                 : scheduleRepository.findConflictsByRoom(
-                    candidate.getRoom().getRoomId(),
+                    candidate.getRoom().getRoomId(), semId,
                     candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd());
             if (!roomConflicts.isEmpty())
                 conflicts.add("Room '" + candidate.getRoom().getRoomName() + "' is already booked at this time.");
@@ -69,10 +70,10 @@ public class ScheduleService {
         if (candidate.getInstructor() != null) {
             List<Schedule> instrConflicts = (excludeScheduleId != null)
                 ? scheduleRepository.findConflictsByInstructorExcluding(
-                    candidate.getInstructor().getInstructorId(), excludeScheduleId,
+                    candidate.getInstructor().getInstructorId(), semId, excludeScheduleId,
                     candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd())
                 : scheduleRepository.findConflictsByInstructor(
-                    candidate.getInstructor().getInstructorId(),
+                    candidate.getInstructor().getInstructorId(), semId,
                     candidate.getDayOfWeek(), candidate.getTimeStart(), candidate.getTimeEnd());
             if (!instrConflicts.isEmpty())
                 conflicts.add("Instructor '" + candidate.getInstructor().getFullName() + "' has another class at this time.");

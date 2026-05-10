@@ -67,23 +67,23 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
 
     // Custom JPQL: room conflict check using the room's business ID instead of its PK
     // Called by: ScheduleService when creating a schedule using room ID strings
-    @Query("SELECT s FROM Schedule s WHERE s.room.roomId = :roomId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
-    List<Schedule> findConflictsByRoom(@Param("roomId") String roomId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+    @Query("SELECT s FROM Schedule s WHERE s.room.roomId = :roomId AND s.section.semester.semesterId = :semId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsByRoom(@Param("roomId") String roomId, @Param("semId") String semId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
 
     // Custom JPQL: instructor conflict check using the instructor's business ID
     // Called by: ScheduleService when creating a schedule using instructor ID strings
-    @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
-    List<Schedule> findConflictsByInstructor(@Param("instructorId") String instructorId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+    @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.section.semester.semesterId = :semId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsByInstructor(@Param("instructorId") String instructorId, @Param("semId") String semId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
 
     // Custom JPQL: room conflict check that excludes one specific schedule ID
     // Used when editing an existing schedule so it does not flag itself as a conflict
-    @Query("SELECT s FROM Schedule s WHERE s.room.roomId = :roomId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
-    List<Schedule> findConflictsByRoomExcluding(@Param("roomId") String roomId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+    @Query("SELECT s FROM Schedule s WHERE s.room.roomId = :roomId AND s.section.semester.semesterId = :semId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsByRoomExcluding(@Param("roomId") String roomId, @Param("semId") String semId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
 
     // Custom JPQL: instructor conflict check that excludes one schedule ID (same self-exclusion logic)
     // Called by: ScheduleService.update() to allow saving a schedule to the same slot it already occupies
-    @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
-    List<Schedule> findConflictsByInstructorExcluding(@Param("instructorId") String instructorId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
+    @Query("SELECT s FROM Schedule s WHERE s.instructor.instructorId = :instructorId AND s.section.semester.semesterId = :semId AND s.scheduleId <> :excludeId AND s.dayOfWeek = :day AND ((s.timeStart < :end) AND (s.timeEnd > :start))")
+    List<Schedule> findConflictsByInstructorExcluding(@Param("instructorId") String instructorId, @Param("semId") String semId, @Param("excludeId") String excludeId, @Param("day") Schedule.DayOfWeek day, @Param("start") java.time.LocalTime start, @Param("end") java.time.LocalTime end);
 
     // Auto-generates: SELECT COUNT(*) > 0 ... JOIN tblcourses WHERE fldCourseID = ?
     // Called by: CurriculumController.updateCourse() to block structural edits to scheduled courses

@@ -870,22 +870,25 @@ function _renderSectionsBySem(semId) {
 
   wrap.innerHTML = sortedYears.map(year => {
     const sections = byYear.get(year);
-    const rows = sections.map(s => `<tr>
+    const rows = sections.map(s => {
+      const syLabel = escHtml(s.semester?.schoolYear?.yearLabel || '');
+      return `<tr>
       <td>${escHtml(s.sectionId)}</td>
       <td>${escHtml(s.sectionCode)}</td>
-      <td>${escHtml(s.sectionName)}</td>
+      <td>${escHtml(s.sectionName)}${syLabel ? `<span class="sy-tag">SY ${syLabel}</span>` : ''}</td>
       <td>${escHtml(s.program?.programCode || '—')}</td>
       <td>
         <span id="sec-badge-${escHtml(s.sectionId)}" class="sec-enroll-badge"
-          onclick="viewSectionStudents('${escHtml(s.sectionId)}','${escHtml(s.sectionName)}',${s.capacity})"
+          onclick="viewSectionStudents('${escHtml(s.sectionId)}','${escHtml(s.sectionName)}',${s.capacity},'${syLabel}')"
           title="Click to view enrolled students">— / ${s.capacity}</span>
       </td>
       <td style="white-space:nowrap">
-        <button class="btn btn-outline btn-sm" onclick="viewSectionStudents('${escHtml(s.sectionId)}','${escHtml(s.sectionName)}',${s.capacity})">View</button>
+        <button class="btn btn-outline btn-sm" onclick="viewSectionStudents('${escHtml(s.sectionId)}','${escHtml(s.sectionName)}',${s.capacity},'${syLabel}')">View</button>
         <button class="btn btn-outline btn-sm registrar-only" onclick='openSectionModal(${JSON.stringify(s)})'>Edit</button>
         <button class="btn btn-danger btn-sm registrar-only" onclick="deleteSection('${escHtml(s.sectionId)}')">Delete</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
 
     return `
       <div class="sec-year-group">
@@ -900,9 +903,9 @@ function _renderSectionsBySem(semId) {
   }).join('');
 }
 
-async function viewSectionStudents(sectionId, sectionName, capacity) {
+async function viewSectionStudents(sectionId, sectionName, capacity, syLabel) {
   document.getElementById('sec-stu-title').textContent = sectionName;
-  document.getElementById('sec-stu-sub').textContent = `Section ID: ${sectionId}`;
+  document.getElementById('sec-stu-sub').textContent = `Section ID: ${sectionId}${syLabel ? ' · SY ' + syLabel : ''}`;
   document.getElementById('sec-stu-count-badge').textContent = '…';
   document.getElementById('sec-stu-search').value = '';
   document.getElementById('tbl-sec-students').innerHTML =
@@ -967,7 +970,7 @@ function _renderScheduleTable(data) {
   data.forEach(s => { _scheduleCache[s.scheduleId] = s; });
   tbody.innerHTML = data.map(s =>
     `<tr>
-      <td>${escHtml(s.section?.sectionCode)}</td>
+      <td>${escHtml(s.section?.sectionCode)}${s.section?.semester?.schoolYear?.yearLabel ? `<span class="sy-tag">SY ${escHtml(s.section.semester.schoolYear.yearLabel)}</span>` : ''}</td>
       <td>${escHtml(s.course?.courseCode)} – ${escHtml(s.course?.courseName)}</td>
       <td>${escHtml(s.instructor?.firstName)} ${escHtml(s.instructor?.lastName)}</td>
       <td>${escHtml(s.room?.roomName)}</td>
@@ -2498,7 +2501,8 @@ async function openEditSchedModal(scheduleId) {
   if (!s) { toast('Schedule data not found', 'error'); return; }
   try { await _populateSchedSelects(); } catch (_) {}
   document.getElementById('sch-modal').classList.add('editing');
-  document.getElementById('sch-modal-title').textContent = `${s.course?.courseCode} – ${s.section?.sectionCode}`;
+  const _syL = s.section?.semester?.schoolYear?.yearLabel;
+  document.getElementById('sch-modal-title').textContent = `${s.course?.courseCode} – ${s.section?.sectionCode}${_syL ? ' (SY ' + _syL + ')' : ''}`;
   document.getElementById('sch-save-btn').textContent    = 'Save Changes';
   document.getElementById('sch-id').value                = s.scheduleId;
   document.getElementById('sch-section').value           = s.section?.sectionId       || '';
