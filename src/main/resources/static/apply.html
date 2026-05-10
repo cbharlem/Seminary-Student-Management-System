@@ -126,6 +126,7 @@
     box-shadow: 0 0 0 3px rgba(46,75,189,0.08);
   }
   .field textarea { resize: vertical; min-height: 72px; }
+  .field-hint { font-size: 0.74rem; color: var(--gray-400); margin-top: 3px; display: block; line-height: 1.4; }
   .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a94b0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 
   /* ── Submit section ──────────────────────────────────── */
@@ -367,26 +368,31 @@
         <div class="field">
           <label for="firstName">First Name <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="firstName" name="firstName" required autocomplete="given-name"
-                 placeholder="e.g. Juan"/>
+                 placeholder="e.g. Juan" minlength="2" maxlength="50"/>
+          <small class="field-hint">Enter your given name exactly as it appears on official documents.</small>
         </div>
         <div class="field">
           <label for="lastName">Last Name <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="lastName" name="lastName" required autocomplete="family-name"
-                 placeholder="e.g. dela Cruz"/>
+                 placeholder="e.g. dela Cruz" minlength="2" maxlength="50"/>
+          <small class="field-hint">Enter your family name exactly as it appears on official documents.</small>
         </div>
         <div class="field">
           <label for="middleName">Middle Name <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="middleName" name="middleName" required autocomplete="additional-name"
-                 placeholder="e.g. Santos"/>
+                 placeholder="e.g. Santos" minlength="2" maxlength="50"/>
+          <small class="field-hint">Enter your mother's maiden surname.</small>
         </div>
         <div class="field">
           <label for="dateOfBirth">Date of Birth <span class="req" aria-hidden="true">*</span></label>
           <input type="date" id="dateOfBirth" name="dateOfBirth" required autocomplete="bday"/>
+          <small class="field-hint">Must match the date on your PSA birth certificate. Cannot be a future date.</small>
         </div>
         <div class="field">
           <label for="placeOfBirth">Place of Birth <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="placeOfBirth" name="placeOfBirth" required
-                 placeholder="e.g. Lipa City, Batangas"/>
+                 placeholder="e.g. Lipa City, Batangas" minlength="3" maxlength="100"/>
+          <small class="field-hint">City or municipality and province.</small>
         </div>
       </div>
     </div>
@@ -398,12 +404,14 @@
         <div class="field">
           <label for="email">Email Address <span class="req" aria-hidden="true">*</span></label>
           <input type="email" id="email" name="email" required autocomplete="email"
-                 placeholder="e.g. juan@example.com"/>
+                 placeholder="e.g. juan@example.com" maxlength="100"/>
+          <small class="field-hint">Use a valid, active email — you will be contacted here.</small>
         </div>
         <div class="field">
           <label for="contactNumber">Contact Number <span class="req" aria-hidden="true">*</span></label>
           <input type="tel" id="contactNumber" name="contactNumber" required autocomplete="tel"
-                 placeholder="e.g. 09171234567"/>
+                 placeholder="e.g. 09171234567" minlength="10" maxlength="15"/>
+          <small class="field-hint">Philippine mobile number (e.g. 09171234567 or +639171234567).</small>
         </div>
         <div class="field">
           <label for="nat-search">Nationality <span class="req" aria-hidden="true">*</span></label>
@@ -424,11 +432,14 @@
             </div>
             <div class="nat-dropdown" id="nat-dropdown" role="listbox"></div>
           </div>
+          <small class="field-hint">Defaults to Filipino. Type to search other nationalities.</small>
         </div>
         <div class="field full">
           <label for="address">Complete Address <span class="req" aria-hidden="true">*</span></label>
           <textarea id="address" name="address" required autocomplete="street-address" rows="3"
-                    placeholder="House/Unit No., Street, Barangay, City/Municipality, Province"></textarea>
+                    placeholder="House/Unit No., Street, Barangay, City/Municipality, Province"
+                    minlength="10" maxlength="300"></textarea>
+          <small class="field-hint">Include house/unit number, street, barangay, city, and province.</small>
         </div>
       </div>
     </div>
@@ -444,12 +455,14 @@
             <option value="Propaedeutic">Propaedeutic</option>
             <option value="College">College</option>
           </select>
+          <small class="field-hint">Choose the level you are applying for.</small>
         </div>
         <div class="field">
           <label for="appliedProgram">Applied Program <span class="req" aria-hidden="true">*</span></label>
           <select id="appliedProgram" name="appliedProgram" required>
             <option value="">— Loading programs… —</option>
           </select>
+          <small class="field-hint">Select your intended academic program.</small>
         </div>
       </div>
     </div>
@@ -461,30 +474,38 @@
         <div class="field">
           <label for="fatherName">Father's Full Name <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="fatherName" name="fatherName" required autocomplete="off"
-                 placeholder="e.g. Pedro dela Cruz"/>
+                 placeholder="e.g. Pedro dela Cruz" minlength="5" maxlength="100"/>
+          <small class="field-hint">Full name — first, middle (or initial), and last name.</small>
         </div>
         <div class="field">
           <label for="fatherOccupation">Father's Occupation <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="fatherOccupation" name="fatherOccupation" required autocomplete="off"
-                 placeholder="e.g. Farmer"/>
+                 placeholder="e.g. Farmer" minlength="2" maxlength="60"/>
+          <small class="field-hint">Current or most recent occupation.</small>
         </div>
         <div class="field">
           <label for="motherName">Mother's Full Name <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="motherName" name="motherName" required autocomplete="off"
-                 placeholder="e.g. Maria Santos"/>
+                 placeholder="e.g. Maria Santos" minlength="5" maxlength="100"/>
+          <small class="field-hint">Full name using her maiden surname.</small>
         </div>
         <div class="field">
           <label for="motherOccupation">Mother's Occupation <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="motherOccupation" name="motherOccupation" required autocomplete="off"
-                 placeholder="e.g. Teacher"/>
+                 placeholder="e.g. Teacher" minlength="2" maxlength="60"/>
+          <small class="field-hint">Current or most recent occupation.</small>
         </div>
         <div class="field">
           <label for="guardianName">Guardian's Name <span style="font-weight:400;color:var(--gray-400)">(if applicable)</span></label>
-          <input type="text" id="guardianName" name="guardianName" autocomplete="off"/>
+          <input type="text" id="guardianName" name="guardianName" autocomplete="off"
+                 minlength="5" maxlength="100"/>
+          <small class="field-hint">Fill in only if you have a legal guardian other than your parents.</small>
         </div>
         <div class="field">
           <label for="guardianContact">Guardian's Contact</label>
-          <input type="tel" id="guardianContact" name="guardianContact" autocomplete="off"/>
+          <input type="tel" id="guardianContact" name="guardianContact" autocomplete="off"
+                 maxlength="15"/>
+          <small class="field-hint">Mobile or landline number of your guardian.</small>
         </div>
       </div>
     </div>
@@ -496,17 +517,20 @@
         <div class="field full">
           <label for="lastSchoolAttended">Last School Attended <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="lastSchoolAttended" name="lastSchoolAttended" required autocomplete="off"
-                 placeholder="e.g. St. Joseph High School"/>
+                 placeholder="e.g. St. Joseph High School" minlength="3" maxlength="150"/>
+          <small class="field-hint">Full name of your most recent school or institution.</small>
         </div>
         <div class="field">
           <label for="lastSchoolYear">School Year <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="lastSchoolYear" name="lastSchoolYear" required autocomplete="off"
-                 placeholder="e.g. 2023-2024"/>
+                 placeholder="e.g. 2023-2024" minlength="9" maxlength="9"/>
+          <small class="field-hint">Format: YYYY-YYYY (e.g. 2023-2024).</small>
         </div>
         <div class="field">
           <label for="lastYearLevel">Year Level / Grade <span class="req" aria-hidden="true">*</span></label>
           <input type="text" id="lastYearLevel" name="lastYearLevel" required autocomplete="off"
-                 placeholder="e.g. Grade 12 / 4th Year"/>
+                 placeholder="e.g. Grade 12 / 4th Year" minlength="2" maxlength="30"/>
+          <small class="field-hint">Your grade or year level at graduation (e.g. Grade 12, 4th Year).</small>
         </div>
       </div>
     </div>
@@ -696,30 +720,69 @@ form.addEventListener('submit', async (e) => {
   const fatherOccupation  = val('fatherOccupation');
   const motherName        = val('motherName');
   const motherOccupation  = val('motherOccupation');
+  const guardianName      = val('guardianName');
+  const guardianContact   = val('guardianContact');
   const lastSchoolAttended = val('lastSchoolAttended');
   const lastSchoolYear    = val('lastSchoolYear');
   const lastYearLevel     = val('lastYearLevel');
 
-  if (!firstName)         return showError(msgError, 'First name is required.');
-  if (!lastName)          return showError(msgError, 'Last name is required.');
-  if (!middleName)        return showError(msgError, 'Middle name is required.');
-  if (!dob)               return showError(msgError, 'Date of birth is required.');
-  if (!placeOfBirth)      return showError(msgError, 'Place of birth is required.');
-  if (!email)             return showError(msgError, 'Email address is required.');
+  const namePattern = /^[A-Za-zÀ-ÖØ-öø-ÿÑñ\s'\-.]+$/;
+
+  // Required + minlength checks — Personal Information
+  if (!firstName)                  return showError(msgError, 'First name is required.');
+  if (firstName.length < 2)        return showError(msgError, 'First name must be at least 2 characters.');
+  if (!namePattern.test(firstName)) return showError(msgError, 'First name must contain letters only — no numbers or special characters.');
+  if (!lastName)                   return showError(msgError, 'Last name is required.');
+  if (lastName.length < 2)         return showError(msgError, 'Last name must be at least 2 characters.');
+  if (!namePattern.test(lastName))  return showError(msgError, 'Last name must contain letters only — no numbers or special characters.');
+  if (!middleName)                 return showError(msgError, 'Middle name is required.');
+  if (middleName.length < 2)       return showError(msgError, 'Middle name must be at least 2 characters.');
+  if (!namePattern.test(middleName)) return showError(msgError, 'Middle name must contain letters only — no numbers or special characters.');
+  if (!dob)                        return showError(msgError, 'Date of birth is required.');
+  if (new Date(dob) >= new Date()) return showError(msgError, 'Date of birth cannot be a future date.');
+  if (!placeOfBirth)               return showError(msgError, 'Place of birth is required.');
+  if (placeOfBirth.length < 3)     return showError(msgError, 'Place of birth must be at least 3 characters.');
+
+  // Contact & Identity
+  if (!email)                      return showError(msgError, 'Email address is required.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return showError(msgError, 'Please enter a valid email address.');
-  if (!contactNumber)     return showError(msgError, 'Contact number is required.');
-  if (!nationality)       return showError(msgError, 'Nationality is required.');
-  if (!address)           return showError(msgError, 'Complete address is required.');
-  if (!level)             return showError(msgError, 'Seminary level is required.');
-  if (!program)           return showError(msgError, 'Applied program is required.');
-  if (!fatherName)        return showError(msgError, "Father's full name is required.");
-  if (!fatherOccupation)  return showError(msgError, "Father's occupation is required.");
-  if (!motherName)        return showError(msgError, "Mother's full name is required.");
-  if (!motherOccupation)  return showError(msgError, "Mother's occupation is required.");
-  if (!lastSchoolAttended) return showError(msgError, 'Last school attended is required.');
-  if (!lastSchoolYear)    return showError(msgError, 'School year is required.');
-  if (!lastYearLevel)     return showError(msgError, 'Year level / grade is required.');
+  if (!contactNumber)              return showError(msgError, 'Contact number is required.');
+  if (!/^(\+639|09)\d{9}$/.test(contactNumber.replace(/\s/g, '')))
+    return showError(msgError, 'Enter a valid Philippine mobile number (e.g. 09171234567 or +639171234567).');
+  if (!nationality)                return showError(msgError, 'Nationality is required.');
+  if (!address)                    return showError(msgError, 'Complete address is required.');
+  if (address.length < 10)         return showError(msgError, 'Please enter a more complete address (at least 10 characters).');
+
+  // Seminary Enrollment
+  if (!level)                      return showError(msgError, 'Seminary level is required.');
+  if (!program)                    return showError(msgError, 'Applied program is required.');
+
+  // Family Background
+  if (!fatherName)                 return showError(msgError, "Father's full name is required.");
+  if (fatherName.length < 5)       return showError(msgError, "Father's full name must be at least 5 characters. Include first and last name.");
+  if (!fatherOccupation)           return showError(msgError, "Father's occupation is required.");
+  if (fatherOccupation.length < 2) return showError(msgError, "Father's occupation must be at least 2 characters.");
+  if (!motherName)                 return showError(msgError, "Mother's full name is required.");
+  if (motherName.length < 5)       return showError(msgError, "Mother's full name must be at least 5 characters. Include first and last name.");
+  if (!motherOccupation)           return showError(msgError, "Mother's occupation is required.");
+  if (motherOccupation.length < 2) return showError(msgError, "Mother's occupation must be at least 2 characters.");
+  if (guardianName && guardianName.length < 5)
+    return showError(msgError, "Guardian's name must be at least 5 characters if provided.");
+  if (guardianContact && !/^(\+639|09)\d{9}$/.test(guardianContact.replace(/\s/g, '')))
+    return showError(msgError, "Enter a valid Philippine mobile number for the guardian's contact.");
+
+  // Previous Education
+  if (!lastSchoolAttended)         return showError(msgError, 'Last school attended is required.');
+  if (lastSchoolAttended.length < 3) return showError(msgError, 'Last school attended must be at least 3 characters.');
+  if (!lastSchoolYear)             return showError(msgError, 'School year is required.');
+  if (!/^\d{4}-\d{4}$/.test(lastSchoolYear))
+    return showError(msgError, 'School year must be in YYYY-YYYY format (e.g. 2023-2024).');
+  const [yearFrom, yearTo] = lastSchoolYear.split('-').map(Number);
+  if (yearTo !== yearFrom + 1)
+    return showError(msgError, 'School year must be consecutive (e.g. 2023-2024, not 2022-2024).');
+  if (!lastYearLevel)              return showError(msgError, 'Year level / grade is required.');
+  if (lastYearLevel.length < 2)    return showError(msgError, 'Year level / grade must be at least 2 characters.');
 
   // Document validation
   const docInputs = [
@@ -921,6 +984,7 @@ const NATIONALITIES = [
 
 // Show the info note once the page settles
 window.addEventListener('load', () => {
+  document.getElementById('dateOfBirth').max = new Date().toISOString().split('T')[0];
   msgInfo.classList.add('show');
   loadPrograms();
 });
